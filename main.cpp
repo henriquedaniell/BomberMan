@@ -1,6 +1,6 @@
 /**
     Estrutura inicial para um jogo
-    vers√£o: 0.1 (Prof. Alex,  Adaptado Prof. Felski)
+    vers„o: 0.1 (Prof. Alex,  Adaptado Prof. Felski)
 */
 #include <iostream>
 #include <windows.h>
@@ -27,13 +27,19 @@ int main()
         //FIM: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
     ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, ACIMA.
 
-    int m[7][7]={   1,1,1,1,1,1,1,
-                    1,0,0,0,0,0,1,
-                    1,0,0,0,1,1,1,
-                    1,0,0,0,1,0,1,
-                    1,1,0,0,1,0,1,
-                    1,0,0,0,0,0,1,
-                    1,1,1,1,1,1,1};
+    int m[19][13]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
+                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+                    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
 
     //Posicao inicial do personagem no console
@@ -46,8 +52,8 @@ int main()
         SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
         ///Imprime o jogo: mapa e personagem.
-        for(int i=0;i<7;i++){
-            for(int j=0;j<7;j++){
+        for(int i=0;i<13;i++){
+            for(int j=0;j<19;j++){
                 if(i==x && j==y){
                     cout<<char(36); //personagem
                 } else {
