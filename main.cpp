@@ -89,13 +89,16 @@ int main()
                         x--;
                 break;
                 case 80: case 's': ///baixo
-                    x++;
+                    if (m[x+1][y] == 0)
+                        x++;
                 break;
                 case 75:case 'a': ///esquerda
-                    y--;
+                    if (m[x][y-1] == 0)
+                        y--;
                 break;
                 case 77: case 'd': ///direita
-                    y++;
+                    if (m[x][y+1] == 0)
+                        y++;
                 break;
                 case 'f': ///Colocar bomba
                     m[x][y]=2;
