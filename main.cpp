@@ -1,10 +1,12 @@
 /**
     Estrutura inicial para um jogo
-    vers�o: 0.1 (Prof. Alex,  Adaptado Prof. Felski)
+    versão: 0.1 (Prof. Alex,  Adaptado Prof. Felski)
 */
 #include <iostream>
 #include <windows.h>
 #include <conio.h>
+#include <chrono>
+#include <thread>
 
 using namespace std;
 
@@ -27,7 +29,16 @@ int main()
         //FIM: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
     ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, ACIMA.
 
-    int m[19][13]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+    // 1. Configura o terminal para aceitar caracteres Unicode (como a bola '●')
+    SetConsoleOutputCP(CP_UTF8);
+
+    // 2. Configura o terminal para aceitar códigos de cores ANSI
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD dwMode = 0;
+    GetConsoleMode(hOut, &dwMode);
+    SetConsoleMode(hOut, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+
+    int m[13][19]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
                     1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
                     1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
@@ -60,6 +71,7 @@ int main()
                     switch (m[i][j]){
                         case 0: cout<<" "; break; //caminho
                         case 1: cout<<char(219); break; //parede
+                        case 2: cout<<"\033[31m" << "●" << "\033[0m";
                         //default: cout<<"-"; //erro
                     } //fim switch
                 }
@@ -84,6 +96,8 @@ int main()
                 case 77: case 'd': ///direita
                     y++;
                 break;
+                case 'f': ///Colocar bomba
+                    m[x][y]=2;
             }
          }
 
