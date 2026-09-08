@@ -85,7 +85,8 @@ int main()
             switch(tecla)
             {
                 case 72: case 'w': ///cima
-                    x--;
+                    if (m[x-1][y] == 0)
+                        x--;
                 break;
                 case 80: case 's': ///baixo
                     x++;
@@ -98,6 +99,7 @@ int main()
                 break;
                 case 'f': ///Colocar bomba
                     m[x][y]=2;
+                break;
             }
          }
 
