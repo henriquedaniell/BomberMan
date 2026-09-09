@@ -7,6 +7,7 @@
 #include <conio.h>
 #include <chrono>
 #include <thread>
+#include <random>
 
 using namespace std;
 
@@ -29,32 +30,48 @@ int main()
         //FIM: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
     ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, ACIMA.
 
-    // 1. Configura o terminal para aceitar caracteres Unicode (como a bola '●')
-    SetConsoleOutputCP(CP_UTF8);
+    ///TRECHO PARA ACEITAR CÓDIGOS DE CORES ANSI E CARACTERES UNICODE
+        // 1. Configura o terminal para aceitar caracteres Unicode (como a bola '●')
+        SetConsoleOutputCP(CP_UTF8);
 
-    // 2. Configura o terminal para aceitar códigos de cores ANSI
-    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD dwMode = 0;
-    GetConsoleMode(hOut, &dwMode);
-    SetConsoleMode(hOut, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        // 2. Configura o terminal para aceitar códigos de cores ANSI
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD dwMode = 0;
+        GetConsoleMode(hOut, &dwMode);
+        SetConsoleMode(hOut, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    ///FIM DO TRECHO
+
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_int_distribution<> distrib(1, 10);
 
     int m[13][19]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
-                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
-                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
-                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
-                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
-                    1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,
-                    1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+                    1,0,0,0,2,0,2,2,2,2,2,0,2,2,2,2,0,0,1,
+                    1,0,1,2,1,2,1,0,1,0,1,2,1,0,1,2,1,0,1,
+                    1,2,2,2,0,2,2,2,0,2,2,2,0,2,2,2,0,2,1,
+                    1,0,1,2,1,0,1,2,1,2,1,2,1,0,1,0,1,2,1,
+                    1,2,2,0,2,2,2,2,2,0,2,0,2,2,0,2,2,0,1,
+                    1,0,1,2,1,2,1,0,1,0,1,2,1,0,1,2,1,2,1,
+                    1,2,2,2,2,0,2,0,2,0,2,2,0,2,2,2,2,2,1,
+                    1,0,1,2,1,2,1,2,1,2,1,2,1,0,1,0,1,2,1,
+                    1,2,2,0,2,2,0,2,0,2,2,0,2,2,0,0,2,2,1,
+                    1,0,1,2,1,0,1,0,1,2,1,2,1,2,1,2,1,0,1,
+                    1,0,0,2,0,2,2,2,2,0,2,2,2,2,2,2,0,0,1,
                     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
-
+    int sorteioParede = 0;
+    for(int i=0; i<13; i++){
+        for(int j=0; j<19; j++){
+            if(m[i][j]==2){
+                sorteioParede = distrib(gen);
+                if(sorteioParede>6){
+                    m[i][j]=0;
+                }
+            }
+        }
+    }
     //Posicao inicial do personagem no console
-    int x=5, y=5;
+    int x=1, y=1;
     //Variavel para tecla precionada
     char tecla;
 
@@ -66,12 +83,13 @@ int main()
         for(int i=0;i<13;i++){
             for(int j=0;j<19;j++){
                 if(i==x && j==y){
-                    cout<<char(36); //personagem
+                    cout<< "🤠 "; //personagem
                 } else {
                     switch (m[i][j]){
-                        case 0: cout<<" "; break; //caminho
-                        case 1: cout<<char(219); break; //parede
-                        case 2: cout<<"\033[31m" << "●" << "\033[0m";
+                        case 0: cout<<"   "; break; //caminho
+                        case 1: cout << "\033[90m" << "███" << "\033[0m"; break;
+                        case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break;
+                        case 3: cout << "\033[31m" << " ● " << "\033[0m"; break;
                         //default: cout<<"-"; //erro
                     } //fim switch
                 }
@@ -101,7 +119,7 @@ int main()
                         y++;
                 break;
                 case 'f': ///Colocar bomba
-                    m[x][y]=2;
+                    m[x][y]=3;
                 break;
             }
          }
