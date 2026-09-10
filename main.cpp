@@ -11,6 +11,24 @@
 
 using namespace std;
 
+// Variavel que diz se uma bomba foi colocada
+bool bombPlaced = false;
+
+struct bomba {
+    int x, y, texture = 0;
+};
+
+string corBomba(int segundosRestantes)
+{
+    switch(segundosRestantes)
+    {
+        case 3: return "\033[38;5;226m";
+        case 2: return "\033[38;5;208m";
+        case 1: return "\033[38;5;196m";
+    }
+
+    return "\033[0m";
+}
 
 int main()
 {
@@ -59,6 +77,12 @@ int main()
                     1,0,0,2,0,2,2,2,2,0,2,2,2,2,2,2,0,0,1,
                     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
+    // Inicialização da struct bomba (b1)
+    bomba b1;
+
+    // Inicialização variavel que armazena o timer da bomba
+    auto tempoBomba = chrono::steady_clock::now();
+
     int sorteioParede = 0;
     for(int i=0; i<13; i++){
         for(int j=0; j<19; j++){
@@ -89,7 +113,7 @@ int main()
                         case 0: cout<<"   "; break; //caminho
                         case 1: cout << "\033[90m" << "███" << "\033[0m"; break;
                         case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break;
-                        case 3: cout << "\033[31m" << " ● " << "\033[0m"; break;
+                        case 3: cout << corBomba(b1.texture) << " ● " << "\033[0m"; break;
                         //default: cout<<"-"; //erro
                     } //fim switch
                 }
@@ -118,11 +142,41 @@ int main()
                     if (m[x][y+1] == 0)
                         y++;
                 break;
-                case 'f': ///Colocar bomba
-                    m[x][y]=3;
+                case 'f':
+                    // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
+                    if (!bombPlaced) {
+                        m[x][y] = 3;
+
+                        b1.x = x;
+                        b1.y = y;
+
+                        bombPlaced = true;
+
+                        tempoBomba = chrono::steady_clock::now(); // define o tempo em que a bomba foi posicionada
+                    }
                 break;
             }
          }
+
+         // timer da bomba depois de posicionada:
+         if (bombPlaced) {
+            auto agora = chrono::steady_clock::now(); // define o tempo de AGORA
+
+            auto tempoPassado = chrono::duration_cast<chrono::seconds>(
+                agora - tempoBomba
+            ).count(); // conta quanto tempo já passou desde o posicionamento da bomba em SEGUNDOS, de acordo com o "AGORA"
+
+            b1.texture = 3 - tempoPassado; // atualiza a textura da bomba
+
+            if (tempoPassado >= 3) { // se passarem os 5 segundos do timer:
+                // EXPLODE
+                m[b1.x][b1.y] = 0;
+
+                bombPlaced = false;
+
+                cout << "\a"; // som de EXPLOSAO
+            }
+        }
 
 
     } //fim do laco do jogo
