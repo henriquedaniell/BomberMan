@@ -113,7 +113,8 @@ int main()
                         case 0: cout<<"   "; break; //caminho
                         case 1: cout << "\033[90m" << "███" << "\033[0m"; break;
                         case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break;
-                        case 3: cout << corBomba(b1.texture) << " ● " << "\033[0m"; break;
+                        case 3: cout << corBomba(b1.texture) << "💣ʔ" << "\033[0m"; break;
+                        case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break;
                         //default: cout<<"-"; //erro
                     } //fim switch
                 }
