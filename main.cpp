@@ -18,6 +18,14 @@ struct bomba {
     int x, y, texture = 0;
 };
 
+struct Inimigo {
+    int x, y, direction=0;
+};
+
+struct Personagem {
+    int x=1, y=1;
+};
+
 string corBomba(int segundosRestantes)
 {
     switch(segundosRestantes)
@@ -62,20 +70,45 @@ int main()
     random_device rd;
     mt19937 gen(rd());
     uniform_int_distribution<> distrib(1, 10);
+    uniform_int_distribution<> ranDir(0, 3);
 
     int m[13][19]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-                    1,0,0,0,2,0,2,2,2,2,2,0,2,2,2,2,0,0,1,
+                    1,0,0,0,2,0,2,2,2,2,2,0,2,2,2,2,0,5,1,
                     1,0,1,2,1,2,1,0,1,0,1,2,1,0,1,2,1,0,1,
                     1,2,2,2,0,2,2,2,0,2,2,2,0,2,2,2,0,2,1,
                     1,0,1,2,1,0,1,2,1,2,1,2,1,0,1,0,1,2,1,
                     1,2,2,0,2,2,2,2,2,0,2,0,2,2,0,2,2,0,1,
-                    1,0,1,2,1,2,1,0,1,0,1,2,1,0,1,2,1,2,1,
+                    1,0,1,2,1,2,1,0,1,5,1,2,1,0,1,2,1,2,1,
                     1,2,2,2,2,0,2,0,2,0,2,2,0,2,2,2,2,2,1,
                     1,0,1,2,1,2,1,2,1,2,1,2,1,0,1,0,1,2,1,
                     1,2,2,0,2,2,0,2,0,2,2,0,2,2,0,0,2,2,1,
                     1,0,1,2,1,0,1,0,1,2,1,2,1,2,1,2,1,0,1,
-                    1,0,0,2,0,2,2,2,2,0,2,2,2,2,2,2,0,0,1,
+                    1,5,0,2,0,2,2,2,2,0,2,2,2,2,2,2,0,5,1,
                     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+
+    Inimigo inimigos[4];
+    inimigos[0].x=11;
+    inimigos[0].y=1;
+
+    inimigos[1].x=6;
+    inimigos[1].y=6;
+
+    inimigos[2].x=17;
+    inimigos[2].y=17;
+
+    inimigos[3].x=1;
+    inimigos[3].y=17;
+
+    for(int i=0; i<4; i++){
+        while(true){
+            inimigos[i].direction = ranDir(gen);
+            switch(inimigos[i].direction):
+            case 1:
+                if(inimigos[i].x+1==0){
+                    inimigos[i].x+=1;
+                } else if(inimigos[i].x+1==)
+        }
+    }
 
     // Inicialização da struct bomba (b1)
     bomba b1;
@@ -94,8 +127,7 @@ int main()
             }
         }
     }
-    //Posicao inicial do personagem no console
-    int x=1, y=1;
+
     //Variavel para tecla precionada
     char tecla;
 
@@ -106,7 +138,7 @@ int main()
         ///Imprime o jogo: mapa e personagem.
         for(int i=0;i<13;i++){
             for(int j=0;j<19;j++){
-                if(i==x && j==y){
+                if(i==Personagem.x && j==Personagem.y){
                     cout<< "🤠 "; //personagem
                 } else {
                     switch (m[i][j]){
@@ -114,6 +146,8 @@ int main()
                         case 1: cout << "\033[90m" << "███" << "\033[0m"; break;
                         case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break;
                         case 3: cout << corBomba(b1.texture) << " ● " << "\033[0m"; break;
+
+                        case 5: cout << "👾 " << break;
                         //default: cout<<"-"; //erro
                     } //fim switch
                 }
@@ -127,28 +161,28 @@ int main()
             switch(tecla)
             {
                 case 72: case 'w': ///cima
-                    if (m[x-1][y] == 0)
+                    if (m[Personagem.x-1][Personagem.y] == 0)
                         x--;
                 break;
                 case 80: case 's': ///baixo
-                    if (m[x+1][y] == 0)
+                    if (m[Personagem.x+1][Personagem.y] == 0)
                         x++;
                 break;
                 case 75:case 'a': ///esquerda
-                    if (m[x][y-1] == 0)
+                    if (m[Personagem.x][Personagem.y-1] == 0)
                         y--;
                 break;
                 case 77: case 'd': ///direita
-                    if (m[x][y+1] == 0)
+                    if (m[Personagem.x][Personagem.y+1] == 0)
                         y++;
                 break;
                 case 'f':
                     // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
                     if (!bombPlaced) {
-                        m[x][y] = 3;
+                        m[Personagem.x][Personagem.y] = 3;
 
-                        b1.x = x;
-                        b1.y = y;
+                        b1.x = Personagem.x;
+                        b1.y = Personagem.y;
 
                         bombPlaced = true;
 
@@ -168,7 +202,7 @@ int main()
 
             b1.texture = 3 - tempoPassado; // atualiza a textura da bomba
 
-            if (tempoPassado >= 3) { // se passarem os 5 segundos do timer:
+            if (tempoPassado >= 3) { // se passarem os 3 segundos do timer:
                 // EXPLODE
                 m[b1.x][b1.y] = 0;
 
