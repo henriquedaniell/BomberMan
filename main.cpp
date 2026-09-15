@@ -13,9 +13,19 @@ using namespace std;
 
 // Variavel que diz se uma bomba foi colocada
 bool bombPlaced = false;
+int alive = true;
+
 
 struct bomba {
     int x, y, texture = 0;
+};
+
+struct Inimigo {
+    int x, y, direction=0;
+};
+
+struct Personagem {
+    int x=1, y=1;
 };
 
 string corBomba(int segundosRestantes)
@@ -62,20 +72,40 @@ int main()
     random_device rd;
     mt19937 gen(rd());
     uniform_int_distribution<> distrib(1, 10);
+    uniform_int_distribution<> ranDir(0, 3);
 
     int m[13][19]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-                    1,0,0,0,2,0,2,2,2,2,2,0,2,2,2,2,0,0,1,
+                    1,0,0,0,2,0,2,2,2,2,2,0,2,2,2,2,0,5,1,
                     1,0,1,2,1,2,1,0,1,0,1,2,1,0,1,2,1,0,1,
                     1,2,2,2,0,2,2,2,0,2,2,2,0,2,2,2,0,2,1,
                     1,0,1,2,1,0,1,2,1,2,1,2,1,0,1,0,1,2,1,
                     1,2,2,0,2,2,2,2,2,0,2,0,2,2,0,2,2,0,1,
-                    1,0,1,2,1,2,1,0,1,0,1,2,1,0,1,2,1,2,1,
+                    1,0,1,2,1,2,1,0,1,5,1,2,1,0,1,2,1,2,1,
                     1,2,2,2,2,0,2,0,2,0,2,2,0,2,2,2,2,2,1,
                     1,0,1,2,1,2,1,2,1,2,1,2,1,0,1,0,1,2,1,
                     1,2,2,0,2,2,0,2,0,2,2,0,2,2,0,0,2,2,1,
                     1,0,1,2,1,0,1,0,1,2,1,2,1,2,1,2,1,0,1,
-                    1,0,0,2,0,2,2,2,2,0,2,2,2,2,2,2,0,0,1,
+                    1,5,0,2,0,2,2,2,2,0,2,2,2,2,2,2,0,5,1,
                     1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+
+    Inimigo inimigos[4];
+    inimigos[0].x=11;
+    inimigos[0].y=1;
+
+    inimigos[1].x=6;
+    inimigos[1].y=9;
+
+    inimigos[2].x=11;
+    inimigos[2].y=17;
+
+    inimigos[3].x=1;
+    inimigos[3].y=17;
+
+    // Inicialização da struct Personagem (player)
+    Personagem player;
+
+    // Inicialização da variável que armazena o timer do movimento dos inimigos.
+    auto tempoInimigos = chrono::steady_clock::now();
 
     // Inicialização da struct bomba (b1)
     bomba b1;
@@ -94,8 +124,7 @@ int main()
             }
         }
     }
-    //Posicao inicial do personagem no console
-    int x=1, y=1;
+
     //Variavel para tecla precionada
     char tecla;
 
@@ -106,7 +135,7 @@ int main()
         ///Imprime o jogo: mapa e personagem.
         for(int i=0;i<13;i++){
             for(int j=0;j<19;j++){
-                if(i==x && j==y){
+                if(i==player.x && j==player.y){
                     cout<< "🤠 "; //personagem
                 } else {
                     switch (m[i][j]){
@@ -114,6 +143,8 @@ int main()
                         case 1: cout << "\033[90m" << "███" << "\033[0m"; break;
                         case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break;
                         case 3: cout << corBomba(b1.texture) << " ● " << "\033[0m"; break;
+
+                        case 5: cout << "👾 "; break;
                         //default: cout<<"-"; //erro
                     } //fim switch
                 }
@@ -122,33 +153,41 @@ int main()
         } //fim for mapa
 
         ///executa os movimentos
-         if ( _kbhit() ){
+        if ( _kbhit() ){
             tecla = getch();
             switch(tecla)
             {
                 case 72: case 'w': ///cima
-                    if (m[x-1][y] == 0)
-                        x--;
+                    if (m[player.x-1][player.y] == 0)
+                        player.x--;
+                    else if(m[player.x-1][player.y] == 5)
+                        alive = false;
                 break;
                 case 80: case 's': ///baixo
-                    if (m[x+1][y] == 0)
-                        x++;
+                    if (m[player.x+1][player.y] == 0)
+                        player.x++;
+                    else if(m[player.x+1][player.y] == 5)
+                        alive = false;
                 break;
                 case 75:case 'a': ///esquerda
-                    if (m[x][y-1] == 0)
-                        y--;
+                    if (m[player.x][player.y-1] == 0)
+                        player.y--;
+                    else if(m[player.x][player.y-1] == 5)
+                        alive = false;
                 break;
                 case 77: case 'd': ///direita
-                    if (m[x][y+1] == 0)
-                        y++;
+                    if (m[player.x][player.y+1] == 0)
+                        player.y++;
+                    else if(m[player.x][player.y+1] == 5)
+                        alive = false;
                 break;
                 case 'f':
                     // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
                     if (!bombPlaced) {
-                        m[x][y] = 3;
+                        m[player.x][player.y] = 3;
 
-                        b1.x = x;
-                        b1.y = y;
+                        b1.x = player.x;
+                        b1.y = player.y;
 
                         bombPlaced = true;
 
@@ -156,7 +195,63 @@ int main()
                     }
                 break;
             }
-         }
+
+        }
+
+
+        auto agoraInimigos = chrono::steady_clock::now();
+        auto tempoPassadoInimigos = chrono::duration_cast<chrono::milliseconds>(
+            agoraInimigos - tempoInimigos
+        ).count();
+
+        if(tempoPassadoInimigos >= 1000){ // If de confirmação se passou um segundo
+            for(int i=0; i<4; i++){
+                bool mexeu = false;
+                int tentativas = 0;
+                int velhoX = inimigos[i].x; // Guarda a posição antiga do inimigo.
+                int velhoY = inimigos[i].y;
+
+                while(!mexeu && tentativas < 10){
+                    inimigos[i].direction = ranDir(gen);
+                    switch(inimigos[i].direction){
+                        case 0:
+                            if (m[inimigos[i].x-1][inimigos[i].y] == 0){ // Para cima
+                                inimigos[i].x-=1;
+                                mexeu = true;
+                            } else if(m[player.x-1][player.y] == 5)
+                                alive = false;
+                            break;
+                        case 1:
+                            if (m[inimigos[i].x+1][inimigos[i].y] == 0){ // Para baixo
+                                inimigos[i].x+=1;
+                                mexeu = true;
+                            } else if(m[player.x+1][player.y] == 5)
+                                alive = false;
+                            break;
+                        case 2:
+                            if (m[inimigos[i].x][inimigos[i].y-1] == 0){ // Para esquerda
+                                inimigos[i].y-=1;
+                                mexeu = true;
+                            } else if(m[player.x][player.y-1] == 5)
+                                alive = false;
+                            break;
+                        case 3:
+                            if (m[inimigos[i].x][inimigos[i].y+1] == 0){ // Para direita
+                                inimigos[i].y+=1;
+                                mexeu = true;
+                            } else if(m[player.x][player.y+1] == 5)
+                                alive = false;
+                            break;
+                    }
+                    tentativas++;
+                }
+                if (mexeu) {
+                    m[velhoX][velhoY] = 0;                     // Excluí o desenho do inimigo que estava na posição anterior.
+                    m[inimigos[i].x][inimigos[i].y] = 5;       // Desenha o inimigo na posição nova.
+                }
+            }
+            tempoInimigos = agoraInimigos; // Reinicia o cronômetro
+        }
 
          // timer da bomba depois de posicionada:
          if (bombPlaced) {
@@ -168,7 +263,7 @@ int main()
 
             b1.texture = 3 - tempoPassado; // atualiza a textura da bomba
 
-            if (tempoPassado >= 3) { // se passarem os 5 segundos do timer:
+            if (tempoPassado >= 3) { // se passarem os 3 segundos do timer:
                 // EXPLODE
                 m[b1.x][b1.y] = 0;
 
