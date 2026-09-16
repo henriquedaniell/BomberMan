@@ -8,6 +8,7 @@
 #include <chrono>
 #include <thread>
 #include <random>
+#include <cstdlib>
 
 using namespace std;
 
@@ -15,6 +16,7 @@ using namespace std;
 bool bombPlaced = false, isExploding = false;
 // Variavel que seta se o player esta vivo
 bool alive = true;
+int escolha = 0;
 
 
 struct bomba {
@@ -46,6 +48,7 @@ string corBomba(int segundosRestantes) {
 
 int main()
 {
+
     ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
         //INICIO: COMANDOS PARA QUE O CURSOR NAO FIQUE PISCANDO NA TELA
         HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -77,6 +80,31 @@ int main()
     mt19937 gen(rd());
     uniform_int_distribution<> distrib(1, 10);
     uniform_int_distribution<> ranDir(0, 3);
+
+    while(escolha!=1){
+        cout << "\033[2J\033[H";
+
+        cout << " ||===\\\\  ||==== ||\\   /||      \\\\      // || ||\\   || ||==\\\\   //==\\\\      " << endl;
+        cout << " ||   //  ||     ||\\\\ //||       \\\\    //  || ||\\\\  || ||   \\\\ ||    ||       " << endl;
+        cout << " ||===|   ||==   || \\// || ====   \\\\  //   || || \\\\ || ||   || ||    ||          " << endl;
+        cout << " ||   \\\\  ||     ||     ||         \\\\//    || ||  \\\\|| ||   // ||    ||         " << endl;
+        cout << " ||===//  ||==== ||     ||          \\/     || ||   \\|| ||==//   \\\\==//            " << endl;
+
+        this_thread::sleep_for(std::chrono::seconds(2));
+        cout << "\033[2J\033[H";
+
+        cout << "         BOMBERMAN          " << endl;
+        cout << " ========================== " << endl;
+        cout << "||                        ||" << endl;
+        cout << "||       1- Jogar         ||" << endl;
+        cout << "||       2- Sair          ||" << endl;
+        cout << "||                        ||" << endl;
+        cout << " ========================== " << endl;
+        cout << "     ESCOLHA UMA OPCAO: ";
+        cin >> escolha;
+        if(escolha==2)
+            return 0;
+    }
 
     int m[13][19]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                     1,0,0,0,2,0,2,2,2,2,2,0,2,2,2,2,0,5,1,
@@ -166,6 +194,9 @@ int main()
             }
             cout<<"\n";
         } //fim for mapa
+        cout << endl;
+        cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A" << endl;
+        cout << "                   Colocar Bomba - F" << endl;
 
         ///executa os movimentos
         if ( _kbhit() ){
