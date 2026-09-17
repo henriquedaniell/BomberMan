@@ -280,6 +280,7 @@ string corBomba(int segundosRestantes) {
                                     mexeu = true;
                                 } else if(m[inimigos[i].x-1][inimigos[i].y] == 4){
                                     inimigos[i].alive = false;
+                                    m[inimigos[i].x][inimigos[i].y] = 0;
                                     pontos+=250;
                                 }
                                 break;
@@ -291,6 +292,7 @@ string corBomba(int segundosRestantes) {
                                     mexeu = true;
                                 } else if(m[inimigos[i].x+1][inimigos[i].y] == 4){
                                     inimigos[i].alive = false;
+                                    m[inimigos[i].x][inimigos[i].y] = 0;
                                     pontos+=250;
                                 }
                                 break;
@@ -302,6 +304,7 @@ string corBomba(int segundosRestantes) {
                                     mexeu = true;
                                 } else if(m[inimigos[i].x][inimigos[i].y-1] == 4){
                                     inimigos[i].alive = false;
+                                    m[inimigos[i].x][inimigos[i].y] = 0;
                                     pontos+=250;
                                 }
                                 break;
@@ -313,6 +316,7 @@ string corBomba(int segundosRestantes) {
                                     mexeu = true;
                                 } else if(m[inimigos[i].x][inimigos[i].y+1] == 4){
                                     inimigos[i].alive = false;
+                                    m[inimigos[i].x][inimigos[i].y] = 0;
                                     pontos+=250;
                                 }
                                 break;
@@ -325,7 +329,7 @@ string corBomba(int segundosRestantes) {
                     }
                 }
                 else if (m[inimigos[i].x][inimigos[i].y] == 5) {
-                    m[inimigos[i].x][inimigos[i].y] == 0;
+                    m[inimigos[i].x][inimigos[i].y] = 0;
                 }
             }
             tempoInimigos = agoraInimigos; // Reinicia o cronômetro
