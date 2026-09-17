@@ -10,6 +10,9 @@
 #include <thread>
 #include <random>
 
+//Padronizar deixando tudo em inglês
+//Modularizar os inimigos
+
 using namespace std;
 
 // Variavel que diz se uma bomba foi colocada, e outra para o timer da explosao
