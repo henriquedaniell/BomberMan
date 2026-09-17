@@ -15,9 +15,9 @@ using namespace std;
 // Variavel que diz se uma bomba foi colocada, e outra para o timer da explosao
 bool bombPlaced = false, isExploding = false;
 // Variavel que seta se o player esta vivo
-bool alive = true;
-int escolha = 0;
 
+int escolha = 0;
+int pontos = 0;
 
 struct bomba {
     int x, y, texture = 0;
@@ -25,10 +25,12 @@ struct bomba {
 
 struct Inimigo {
     int x, y, direction=0;
+    bool alive = true;
 };
 
 struct Personagem {
     int x=1, y=1;
+    bool alive = true;
 };
 
 void cruzBomba(int &posMatriz) {
@@ -46,7 +48,7 @@ string corBomba(int segundosRestantes) {
     return "\033[0m";
 }
 
-int main()
+    int main()
 {
 
     ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
@@ -163,8 +165,9 @@ int main()
     //Variavel para tecla precionada
     char tecla;
 
-    while(alive){
-        ///Posiciona a escrita no iicio do console
+    //Começa o jogo
+    while(player.alive){
+        ///Posiciona a escrita no início do console
         SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
         ///Imprime o jogo: mapa e personagem.
@@ -197,6 +200,7 @@ int main()
         cout << endl;
         cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A" << endl;
         cout << "                   Colocar Bomba - F" << endl;
+        cout << "                   PONTOS: " << pontos << endl;
 
         ///executa os movimentos
         if ( _kbhit() ){
@@ -204,28 +208,28 @@ int main()
             switch(tecla)
             {
                 case 72: case 'w': ///cima
-                    if (m[player.x-1][player.y] == 0 || m[player.x-1][player.y] == 3)
+                    if (m[player.x-1][player.y] == 0)
                         player.x--;
                     else if(m[player.x-1][player.y] == 5 || m[player.x-1][player.y] == 4)
-                        alive = false;
+                        player.alive = false;
                 break;
                 case 80: case 's': ///baixo
-                    if (m[player.x+1][player.y] == 0 || m[player.x+1][player.y] == 3)
+                    if (m[player.x+1][player.y] == 0)
                         player.x++;
                     else if(m[player.x+1][player.y] == 5 || m[player.x+1][player.y] == 4)
-                        alive = false;
+                        player.alive = false;
                 break;
                 case 75:case 'a': ///esquerda
-                    if (m[player.x][player.y-1] == 0 || m[player.x][player.y-1] == 3)
+                    if (m[player.x][player.y-1] == 0)
                         player.y--;
                     else if(m[player.x][player.y-1] == 5 || m[player.x][player.y-1] == 4)
-                        alive = false;
+                        player.alive = false;
                 break;
                 case 77: case 'd': ///direita
-                    if (m[player.x][player.y+1] == 0 || m[player.x][player.y+1] == 3)
+                    if (m[player.x][player.y+1] == 0)
                         player.y++;
                     else if(m[player.x][player.y+1] == 5 || m[player.x][player.y+1] == 4)
-                        alive = false;
+                        player.alive = false;
                 break;
                 case 'f':
                     // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
@@ -250,43 +254,81 @@ int main()
             agoraInimigos - tempoInimigos
         ).count();
 
+        // Movimento dos inimigos
         if(tempoPassadoInimigos >= 1000){ // If de confirmação se passou um segundo
             for(int i=0; i<4; i++){
+                    
+                if (m[inimigos[i].x][inimigos[i].y] == 4){
+                    inimigos[i].alive = false;
+                    m[inimigos[i].x][inimigos[i].y] = 0;
+                    inimigos[i].x = 0;
+                    inimigos[i].y = 0;
+                    pontos+=250;
+                }
+
                 bool mexeu = false;
                 int tentativas = 0;
                 int velhoX = inimigos[i].x; // Guarda a posição antiga do inimigo.
                 int velhoY = inimigos[i].y;
 
-                while(!mexeu && tentativas < 10){
+                while(!mexeu && tentativas < 10 && inimigos[i].alive){
                     inimigos[i].direction = ranDir(gen);
                     switch(inimigos[i].direction){
                         case 0:
                             if (m[inimigos[i].x-1][inimigos[i].y] == 0){ // Para cima
                                 inimigos[i].x-=1;
                                 mexeu = true;
-                            } else if(m[player.x-1][player.y] == 5)
-                                alive = false;
+                            } else if(m[player.x-1][player.y] == 5
+                                player.alive = false;
+                            else if(m[player.x-1][player.y] == 4){
+                                inimigos[i].alive = false;
+                                m[inimigos[i].x][inimigos[i].y] = 0;
+                                inimigos[i].x = 0;
+                                inimigos[i].y = 0;
+                                pontos+=250;
+                            }
                             break;
                         case 1:
                             if (m[inimigos[i].x+1][inimigos[i].y] == 0){ // Para baixo
                                 inimigos[i].x+=1;
                                 mexeu = true;
                             } else if(m[player.x+1][player.y] == 5)
-                                alive = false;
+                                player.alive = false;
+                            else if(m[player.x+1][player.y] == 4){
+                                inimigos[i].alive = false;
+                                m[inimigos[i].x][inimigos[i].y] = 0;
+                                inimigos[i].x = 0;
+                                inimigos[i].y = 0;
+                                pontos+=250;
+                            }
                             break;
                         case 2:
                             if (m[inimigos[i].x][inimigos[i].y-1] == 0){ // Para esquerda
                                 inimigos[i].y-=1;
                                 mexeu = true;
                             } else if(m[player.x][player.y-1] == 5)
-                                alive = false;
+                                player.alive = false;
+                            else if(m[player.x][player.y-1] == 4){
+                                inimigos[i].alive = false;
+                                m[inimigos[i].x][inimigos[i].y] = 0;
+                                inimigos[i].x = 0;
+                                inimigos[i].y = 0;
+                                pontos+=250;
+                            }
                             break;
                         case 3:
                             if (m[inimigos[i].x][inimigos[i].y+1] == 0){ // Para direita
                                 inimigos[i].y+=1;
                                 mexeu = true;
                             } else if(m[player.x][player.y+1] == 5)
-                                alive = false;
+                                player.alive = false;
+                            else if(m[player.x][player.y+1] == 4){
+                                inimigos[i].alive = false;
+                                m[inimigos[i].x][inimigos[i].y] = 0;
+                                inimigos[i].x = 0;
+                                inimigos[i].y = 0;
+                                pontos+=250;
+                            }
                             break;
                     }
                     tentativas++;
@@ -327,7 +369,7 @@ int main()
 
 		if (isExploding) {
 			if (m[player.x][player.y] == 4)
-				alive = false;
+				player.alive = false;
 			auto agora = chrono::steady_clock::now(); // define o tempo de AGORA
 
             auto tempoPassado = chrono::duration_cast<chrono::seconds>(
@@ -340,8 +382,15 @@ int main()
 			}
 		}
 
+        if(player.alive == false)
+            cout << "Você morreu! Aperte QUALQUER BOTÃO para continuar.";
+        else if(pontos == 1000)
+            cout << "Parabéns! Você matou todos os INIMIGOS! 🏅";
+
 
     } //fim do laco do jogo
+
+
 
     return 0;
 } //fim main
