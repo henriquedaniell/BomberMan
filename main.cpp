@@ -258,84 +258,74 @@ string corBomba(int segundosRestantes) {
         if(tempoPassadoInimigos >= 1000){ // If de confirmação se passou um segundo
             for(int i=0; i<4; i++){
 
-                if (m[inimigos[i].x][inimigos[i].y] == 4){
-                    inimigos[i].alive = false;
-                    m[inimigos[i].x][inimigos[i].y] = 0;
-                    inimigos[i].x = 0;
-                    inimigos[i].y = 0;
-                    pontos+=250;
-                }
-
-                bool mexeu = false;
-                int tentativas = 0;
-                int velhoX = inimigos[i].x; // Guarda a posição antiga do inimigo.
-                int velhoY = inimigos[i].y;
-
-                while(!mexeu && tentativas < 10 && inimigos[i].alive){
-                    inimigos[i].direction = ranDir(gen);
-                    switch(inimigos[i].direction){
-                        case 0:
-                            if (m[inimigos[i].x-1][inimigos[i].y] == 0){ // Para cima
-                                inimigos[i].x-=1;
-                                mexeu = true;
-                            } else if(m[player.x-1][player.y] == 5)
-                                player.alive = false;
-                            else if(m[player.x-1][player.y] == 4){
-                                inimigos[i].alive = false;
-                                m[inimigos[i].x][inimigos[i].y] = 0;
-                                inimigos[i].x = 0;
-                                inimigos[i].y = 0;
-                                pontos+=250;
-                            }
-                            break;
-                        case 1:
-                            if (m[inimigos[i].x+1][inimigos[i].y] == 0){ // Para baixo
-                                inimigos[i].x+=1;
-                                mexeu = true;
-                            } else if(m[player.x+1][player.y] == 5)
-                                player.alive = false;
-                            else if(m[player.x+1][player.y] == 4){
-                                inimigos[i].alive = false;
-                                m[inimigos[i].x][inimigos[i].y] = 0;
-                                inimigos[i].x = 0;
-                                inimigos[i].y = 0;
-                                pontos+=250;
-                            }
-                            break;
-                        case 2:
-                            if (m[inimigos[i].x][inimigos[i].y-1] == 0){ // Para esquerda
-                                inimigos[i].y-=1;
-                                mexeu = true;
-                            } else if(m[player.x][player.y-1] == 5)
-                                player.alive = false;
-                            else if(m[player.x][player.y-1] == 4){
-                                inimigos[i].alive = false;
-                                m[inimigos[i].x][inimigos[i].y] = 0;
-                                inimigos[i].x = 0;
-                                inimigos[i].y = 0;
-                                pontos+=250;
-                            }
-                            break;
-                        case 3:
-                            if (m[inimigos[i].x][inimigos[i].y+1] == 0){ // Para direita
-                                inimigos[i].y+=1;
-                                mexeu = true;
-                            } else if(m[player.x][player.y+1] == 5)
-                                player.alive = false;
-                            else if(m[player.x][player.y+1] == 4){
-                                inimigos[i].alive = false;
-                                m[inimigos[i].x][inimigos[i].y] = 0;
-                                inimigos[i].x = 0;
-                                inimigos[i].y = 0;
-                                pontos+=250;
-                            }
-                            break;
+                if (inimigos[i].alive) {
+                    if (m[inimigos[i].x][inimigos[i].y] == 4){
+                        inimigos[i].alive = false;
+                        pontos+=250;
                     }
-                    tentativas++;
+
+                    bool mexeu = false;
+                    int tentativas = 0;
+                    int velhoX = inimigos[i].x; // Guarda a posição antiga do inimigo.
+                    int velhoY = inimigos[i].y;
+
+                    while(!mexeu && tentativas < 10 && inimigos[i].alive && player.alive){
+                        inimigos[i].direction = ranDir(gen);
+                        switch(inimigos[i].direction){
+                            case 0:
+                                if (inimigos[i].x-1 == player.x && inimigos[i].y == player.y) // Para cima
+                                    player.alive = false;
+                                else if (m[inimigos[i].x-1][inimigos[i].y] == 0){
+                                    inimigos[i].x-=1;
+                                    mexeu = true;
+                                } else if(m[inimigos[i].x-1][inimigos[i].y] == 4){
+                                    inimigos[i].alive = false;
+                                    pontos+=250;
+                                }
+                                break;
+                            case 1:
+                                if (inimigos[i].x+1 == player.x && inimigos[i].y == player.y) // Para baixo
+                                    player.alive = false;
+                                else if (m[inimigos[i].x+1][inimigos[i].y] == 0){
+                                    inimigos[i].x+=1;
+                                    mexeu = true;
+                                } else if(m[inimigos[i].x+1][inimigos[i].y] == 4){
+                                    inimigos[i].alive = false;
+                                    pontos+=250;
+                                }
+                                break;
+                            case 2:
+                                if (inimigos[i].x == player.x && inimigos[i].y-1 == player.y) // Para esquerda
+                                    player.alive = false;
+                                else if (m[inimigos[i].x][inimigos[i].y-1] == 0){
+                                    inimigos[i].y-=1;
+                                    mexeu = true;
+                                } else if(m[inimigos[i].x][inimigos[i].y-1] == 4){
+                                    inimigos[i].alive = false;
+                                    pontos+=250;
+                                }
+                                break;
+                            case 3:
+                                if (inimigos[i].x == player.x && inimigos[i].y+1 == player.y) // Para direita
+                                    player.alive = false;
+                                else if (m[inimigos[i].x][inimigos[i].y+1] == 0){
+                                    inimigos[i].y+=1;
+                                    mexeu = true;
+                                } else if(m[inimigos[i].x][inimigos[i].y+1] == 4){
+                                    inimigos[i].alive = false;
+                                    pontos+=250;
+                                }
+                                break;
+                        }
+                        tentativas++;
+                    }
+                    if (mexeu) {
+                        m[velhoX][velhoY] = 0;                     // Excluí o desenho do inimigo que estava na posição anterior.
+                        m[inimigos[i].x][inimigos[i].y] = 5;       // Desenha o inimigo na posição nova.
+                    }
                 }
-                if (mexeu) {
-                    m[velhoX][velhoY] = 0;                     // Excluí o desenho do inimigo que estava na posição anterior.
-                    m[inimigos[i].x][inimigos[i].y] = 5;       // Desenha o inimigo na posição nova.
+                else if (m[inimigos[i].x][inimigos[i].y] == 5) {
+                    m[inimigos[i].x][inimigos[i].y] == 0;
                 }
             }
             tempoInimigos = agoraInimigos; // Reinicia o cronômetro
