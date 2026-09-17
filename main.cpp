@@ -208,25 +208,25 @@ string corBomba(int segundosRestantes) {
             switch(tecla)
             {
                 case 72: case 'w': ///cima
-                    if (m[player.x-1][player.y] == 0 || m[player.x-1][player.y] == 3)
+                    if (m[player.x-1][player.y] == 0)
                         player.x--;
                     else if(m[player.x-1][player.y] == 5 || m[player.x-1][player.y] == 4)
                         player.alive = false;
                 break;
                 case 80: case 's': ///baixo
-                    if (m[player.x+1][player.y] == 0 || m[player.x+1][player.y] == 3)
+                    if (m[player.x+1][player.y] == 0)
                         player.x++;
                     else if(m[player.x+1][player.y] == 5 || m[player.x+1][player.y] == 4)
                         player.alive = false;
                 break;
                 case 75:case 'a': ///esquerda
-                    if (m[player.x][player.y-1] == 0 || m[player.x][player.y-1] == 3)
+                    if (m[player.x][player.y-1] == 0)
                         player.y--;
                     else if(m[player.x][player.y-1] == 5 || m[player.x][player.y-1] == 4)
                         player.alive = false;
                 break;
                 case 77: case 'd': ///direita
-                    if (m[player.x][player.y+1] == 0 || m[player.x][player.y+1] == 3)
+                    if (m[player.x][player.y+1] == 0)
                         player.y++;
                     else if(m[player.x][player.y+1] == 5 || m[player.x][player.y+1] == 4)
                         player.alive = false;
