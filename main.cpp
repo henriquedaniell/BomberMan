@@ -2,7 +2,7 @@
     Estrutura inicial para um jogo
     versão: 0.1 (Prof. Alex,  Adaptado Prof. Felski)
 */
-/// BomberMan (Alunos: Henrique Daniel e Eduardo Ramos 
+/// BomberMan (Alunos: Henrique Daniel e Eduardo Ramos
 #include <iostream>
 #include <windows.h>
 #include <conio.h>
@@ -26,6 +26,7 @@ struct bomba {
 struct Inimigo {
     int x, y, direction=0;
     bool alive = true;
+    chrono::steady_clock::time_point tempoMorte = chrono::steady_clock::now();
 };
 
 struct Personagem {
@@ -46,6 +47,13 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
     }
 
     return "\033[0m";
+}
+
+void matarInimigo(Inimigo &inimigo, int &pontos, int &posMatriz) {
+    inimigo.alive = false;
+    inimigo.tempoMorte = chrono::steady_clock::now();
+    pontos += 250;
+    posMatriz = 6;
 }
 
     int main()
@@ -115,10 +123,13 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
         if(escolha!=1) //Enquanto não escolher 1, fica pedindo para escolher uma opção, caso escolha 2, irá encerrar.
             continue;
 
+        pontos = 0;
+        bombPlaced = false;
+        isExploding = false;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
 
         ///Mapa do Jogo: 0- Caminho livre    1- Parede Indestrutível  2- Parede destrutível   3- Bomba   4- Explosão   5- Inimigo   6- Inimigo morto
-        int m[13][19]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 
+        int m[13][19]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                         1,0,0,0,2,0,2,2,2,2,2,0,2,2,2,2,0,5,1,
                         1,0,1,2,1,2,1,0,1,0,1,2,1,0,1,2,1,0,1,
                         1,2,2,2,0,2,2,2,0,2,2,2,0,2,2,2,0,2,1,
@@ -131,7 +142,7 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
                         1,0,1,2,1,0,1,0,1,2,1,2,1,2,1,2,1,0,1,
                         1,5,0,2,0,2,2,2,2,0,2,2,2,2,2,2,0,5,1,
                         1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
-        
+
         ///Inicialização dos inimigos e suas respectivas posições
         Inimigo inimigos[4];
         inimigos[0].x=11;
@@ -160,9 +171,6 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
 
         // Inicialização variavel que armazena o timer da explosao
         auto tempoExplosao = chrono::steady_clock::now();
-
-        // Inicialização variavel que armazena o timer da morte de cada inimigo
-        chrono::steady_clock::time_point tempoMorte[4];
 
         ///Sorteio das paredes que serão destrutíveis
         int sorteioParede = 0;
@@ -247,7 +255,7 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
                         else if(m[player.x][player.y+1] == 5 || m[player.x][player.y+1] == 4) // Se for dar de cara com o inimigo ou com o raio de explosão de bomba
                             player.alive = false; // Morte
                     break;
-                    case 'f': 
+                    case 'f':
                         // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
                         if (!bombPlaced) {
                             m[player.x][player.y] = 3;
@@ -276,13 +284,7 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
 
                     if (inimigos[i].alive) {
                         if (m[inimigos[i].x][inimigos[i].y] == 4){ // Se está na explosão, ele morre
-                            inimigos[i].alive = false;
-                            pontos+=250;
-
-                            m[inimigos[i].x][inimigos[i].y] = 6;
-
-                            auto agoraMorte = chrono::steady_clock::now(); // define o tempo de AGORA
-                            tempoMorte[i] = chrono::steady_clock::now();
+                            matarInimigo(inimigos[i], pontos, m[inimigos[i].x][inimigos[i].y]);
                         }
 
                         bool mexeu = false;
@@ -300,12 +302,9 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
                                         inimigos[i].x-=1;
                                         mexeu = true;
                                     } else if(m[inimigos[i].x-1][inimigos[i].y] == 4){ // Se for explosão
-                                        inimigos[i].alive = false;
-                                        m[inimigos[i].x][inimigos[i].y] = 0;      // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
-                                        inimigos[i].x -= 1;                       // Inimigo anda
-                                        m[inimigos[i].x-1][inimigos[i].y] = 6;    // Desenha a caveira na célula de destino
-                                        tempoMorte[i] = chrono::steady_clock::now();
-                                        pontos+=250;
+                                        m[inimigos[i].x][inimigos[i].y] = 0;    // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
+                                        inimigos[i].x -= 1;                     // Inimigo anda
+                                        matarInimigo(inimigos[i], pontos, m[inimigos[i].x][inimigos[i].y]);
                                     }
                                     break;
                                 case 1: // Para baixo
@@ -315,42 +314,33 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
                                         inimigos[i].x+=1;
                                         mexeu = true;
                                     } else if(m[inimigos[i].x+1][inimigos[i].y] == 4){ // Se for explosão
-                                        inimigos[i].alive = false;
                                         m[inimigos[i].x][inimigos[i].y] = 0;      // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
                                         inimigos[i].x+=1;                         // Inimigo anda
-                                        m[inimigos[i].x+1][inimigos[i].y] = 6;    // Desenha a caveira na célula de destino
-                                        tempoMorte[i] = chrono::steady_clock::now();
-                                        pontos+=250;
+                                        matarInimigo(inimigos[i], pontos, m[inimigos[i].x][inimigos[i].y]);
                                     }
                                     break;
                                 case 2: // Para esquerda
-                                    if (inimigos[i].x == player.x && inimigos[i].y-1 == player.y) 
+                                    if (inimigos[i].x == player.x && inimigos[i].y-1 == player.y)
                                         player.alive = false;
                                     else if (m[inimigos[i].x][inimigos[i].y-1] == 0){
                                         inimigos[i].y-=1;
                                         mexeu = true;
                                     } else if(m[inimigos[i].x][inimigos[i].y-1] == 4){
-                                        inimigos[i].alive = false;
-                                        m[inimigos[i].x][inimigos[i].y] = 0;     
+                                        m[inimigos[i].x][inimigos[i].y] = 0;
                                         inimigos[i].y-=1;
-                                        m[inimigos[i].x][inimigos[i].y-1] = 6;    
-                                        tempoMorte[i] = chrono::steady_clock::now();
-                                        pontos+=250;
+                                        matarInimigo(inimigos[i], pontos, m[inimigos[i].x][inimigos[i].y]);
                                     }
                                     break;
                                 case 3: // Para direita
-                                    if (inimigos[i].x == player.x && inimigos[i].y+1 == player.y) 
+                                    if (inimigos[i].x == player.x && inimigos[i].y+1 == player.y)
                                         player.alive = false;
                                     else if (m[inimigos[i].x][inimigos[i].y+1] == 0){
                                         inimigos[i].y+=1;
                                         mexeu = true;
                                     } else if(m[inimigos[i].x][inimigos[i].y+1] == 4){
-                                        inimigos[i].alive = false;
-                                        m[inimigos[i].x][inimigos[i].y] = 0;      
+                                        m[inimigos[i].x][inimigos[i].y] = 0;
                                         inimigos[i].y+=1;
-                                        m[inimigos[i].x][inimigos[i].y+1] = 6;    
-                                        tempoMorte[i] = chrono::steady_clock::now();
-                                        pontos+=250;
+                                        matarInimigo(inimigos[i], pontos, m[inimigos[i].x][inimigos[i].y]);
                                     }
                                     break;
                             }
@@ -360,18 +350,6 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
                             m[velhoX][velhoY] = 0;                     // Exclui o desenho do inimigo que estava na posição anterior.
                             m[inimigos[i].x][inimigos[i].y] = 5;       // Desenha o inimigo na posição nova.
                         }
-                    }
-                    else if (m[inimigos[i].x][inimigos[i].y] == 5) { //Inimigo morto que ainda estava desenhado
-                        m[inimigos[i].x][inimigos[i].y] = 0;
-                    }
-                    else if (m[inimigos[i].x][inimigos[i].y] == 6) { //Caveira fica visível por 1 segundo, depois some
-                        auto agoraMorte = chrono::steady_clock::now();
-                        auto tempoPassadoMorte = chrono::duration_cast<chrono::seconds>(
-                            agoraMorte - tempoMorte[i]
-                        ).count();
-
-                        if (tempoPassadoMorte >= 1) // 1 segundo de caveira visível
-                            m[inimigos[i].x][inimigos[i].y] = 0;
                     }
                 }
                 tempoInimigos = agoraInimigos; // Reinicia o cronômetro
@@ -418,10 +396,22 @@ string corBomba(int segundosRestantes) { //Função para pintar o pavio da bomba
                 }
             }
 
+            for (int i = 0; i < 4; i++) {
+                if (!inimigos[i].alive && m[inimigos[i].x][inimigos[i].y] == 6) {
+                    auto agoraMorte = chrono::steady_clock::now();
+                    auto tempoPassadoMorte = chrono::duration_cast<chrono::seconds>(
+                        agoraMorte - inimigos[i].tempoMorte
+                    ).count();
+
+                    if (tempoPassadoMorte >= 1) // 1 segundo de caveira visível
+                        m[inimigos[i].x][inimigos[i].y] = 0;
+                }
+            }
+
         } //Fim do laço do jogo
-    
+
         ///Mensagem de fim de jogo
-        if(player.alive == false) 
+        if(player.alive == false)
             cout << "       Você morreu..." << endl;
         else if(pontos == 1000)
             cout << "       Parabéns! Você matou todos os INIMIGOS! 🏅" << endl;
