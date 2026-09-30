@@ -17,6 +17,8 @@ using namespace std;
 // Variavel que diz se uma bomba foi colocada, e outra para o timer da explosao
 bool bombPlaced = false, isExploding = false;
 
+int mapRows = 13, mapColumns = 19;
+
 int menuChoice = 0; // menu
 int score = 0; // pontuação do jogo
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
@@ -58,7 +60,18 @@ void killEnemy(Enemy &enemy, int &score, int &gridPos) {
     gridPos = 6;
 }
 
-    int main()
+void movePlayer(int gameMap[13][19], Character &player, int newX = 0, int newY = 0) {
+    if (gameMap[player.x + newX][player.y + newY] == 0) {
+        player.x += newX;           // Move o player caso haja caminho livre
+        player.y += newY;
+    }
+    else if(gameMap[player.x + newX][player.y + newY] == 5 || gameMap[player.x + newX][player.y + newY] == 4) {
+        player.alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
+    }
+}
+
+
+int main()
 {
 
     ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
@@ -234,28 +247,16 @@ void killEnemy(Enemy &enemy, int &score, int &gridPos) {
                 switch(keyPressed)
                 {
                     case 72: case 'w': /// Cima
-                        if (mapGrid[player.x-1][player.y] == 0) // Confere se a direção que deseja ir é um caminho livre
-                            player.x--;
-                        else if(mapGrid[player.x-1][player.y] == 5 || mapGrid[player.x-1][player.y] == 4) // Se for dar de cara com o inimigo ou com o raio de explosão de bomba
-                            player.alive = false; // Morte
+                        movePlayer(mapGrid, player, -1);
                     break;
                     case 80: case 's': /// Baixo
-                        if (mapGrid[player.x+1][player.y] == 0) // Confere se a direção que deseja ir é um caminho livre
-                            player.x++;
-                        else if(mapGrid[player.x+1][player.y] == 5 || mapGrid[player.x+1][player.y] == 4) // Se for dar de cara com o inimigo ou com o raio de explosão de bomba
-                            player.alive = false; // Morte
+                        movePlayer(mapGrid, player, 1);
                     break;
                     case 75:case 'a': /// Esquerda
-                        if (mapGrid[player.x][player.y-1] == 0) // Confere se a direção que deseja ir é um caminho livre
-                            player.y--;
-                        else if(mapGrid[player.x][player.y-1] == 5 || mapGrid[player.x][player.y-1] == 4) // Se for dar de cara com o inimigo ou com o raio de explosão de bomba
-                            player.alive = false; // Morte
+                        movePlayer(mapGrid, player, 0, -1);
                     break;
                     case 77: case 'd': /// Direita
-                        if (mapGrid[player.x][player.y+1] == 0) // Confere se a direção que deseja ir é um caminho livre
-                            player.y++;
-                        else if(mapGrid[player.x][player.y+1] == 5 || mapGrid[player.x][player.y+1] == 4) // Se for dar de cara com o inimigo ou com o raio de explosão de bomba
-                            player.alive = false; // Morte
+                        movePlayer(mapGrid, player, 0, 1);
                     break;
                     case 'f':
                         // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
