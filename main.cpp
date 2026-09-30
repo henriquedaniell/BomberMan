@@ -42,7 +42,7 @@ struct Character {
 
 struct Enemy {
     int x, y, direction=0;
-    bool alive = true;
+    bool alive = true, deathAnimation = false;
     chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
 
 	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int newX = 0, int newY = 0) {
@@ -83,11 +83,22 @@ string bombColor(int secondsRemaining) { //Função para pintar o pavio da bomba
     return "\033[0m";
 }
 
-void killEnemy(Enemy &enemy, int &score, int &gridPos) {
-    enemy.alive = false;
-    enemy.deathTimer = chrono::steady_clock::now();
-    score += 250;
-    gridPos = 6;
+int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDuration, bool &timerTrigger, bool needTexture = false) {
+	auto nowTime = chrono::steady_clock::now(); // define o tempo de AGORA
+
+	// Define a duração diretamente como float em segundos
+    chrono::duration<float> elapsedTimeDuration = nowTime - startTime;
+    auto elapsedTime = elapsedTimeDuration.count(); // RETORNA FLOAT
+
+
+	if (elapsedTime >= timerDuration) {		// ativa o gatilho do final do timer, e o desliga
+	    timerTrigger = false;
+	}
+
+	if (needTexture)
+        return timerDuration - elapsedTime + 1;
+    else
+        return 0;
 }
 
 
@@ -296,64 +307,60 @@ int main()
             }
 
 
-            auto enemiesNowTime = chrono::steady_clock::now();
-            auto enemiesTimePast = chrono::duration_cast<chrono::milliseconds>(
-                enemiesNowTime - enemiesMoveTimer
-            ).count();
+			// MOVIMENTO DOS INIMIGOS:
+            {
+                bool cannotMoveYet = true;
+                globalTimer(enemiesMoveTimer, 1, cannotMoveYet);
 
-            // Movimento dos inimigos
-            if(enemiesTimePast >= 1000){ // If de confirmação se passou um segundo
-                for(int i=0; i<4; i++){ // Processamento dos 4 inimigos
+                if (!cannotMoveYet) {
+                    for(int i=0; i<4; i++){ // Processamento dos 4 inimigos
 
-                    if (enemies[i].alive) {
-                        if (mapGrid[enemies[i].x][enemies[i].y] == 4){ // Se está na explosão, ele morre
-                            killEnemy(enemies[i], score, mapGrid[enemies[i].x][enemies[i].y]);
-                        }
+					    if (enemies[i].alive) {
+					        if (mapGrid[enemies[i].x][enemies[i].y] == 4){ // Se está na explosão, ele morre
+					            enemies[i].death(mapGrid[enemies[i].x][enemies[i].y]);
+					        }
 
-                        bool hasMoved = false;
-                        int attempts = 0;
-                        int oldX = enemies[i].x; // Guarda a posição antiga do inimigo.
-                        int oldY = enemies[i].y;
+					        bool hasMoved = false;
+					        int attempts = 0;
+					        int oldX = enemies[i].x; // Guarda a posição antiga do inimigo.
+					        int oldY = enemies[i].y;
 
-                        while(!hasMoved && attempts < 10 && enemies[i].alive && player.alive){ // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
-                            enemies[i].direction = ranDir(gen); // Sorteia uma direção
-                            switch(enemies[i].direction){
-                                case 0: // Para cima
-                                    enemies[i].movement(mapGrid, player, hasMoved, -1);
-                                    break;
-                                case 1: // Para baixo
-                                    enemies[i].movement(mapGrid, player, hasMoved, 1);
-                                    break;
-                                case 2: // Para esquerda
-                                    enemies[i].movement(mapGrid, player, hasMoved, 0, -1);
-                                    break;
-                                case 3: // Para direita
-                                    enemies[i].movement(mapGrid, player, hasMoved, 0, 1);
-                                    break;
-                            }
-                            attempts++; // Aumenta o contador de tentativas
-                        }
-                        if (hasMoved) {
-                            mapGrid[oldX][oldY] = 0;                     // Exclui o desenho do inimigo que estava na posição anterior.
-                            mapGrid[enemies[i].x][enemies[i].y] = 5;       // Desenha o inimigo na posição nova.
-                        }
-                    }
+					        while(!hasMoved && attempts < 10 && enemies[i].alive && player.alive){ // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
+					            enemies[i].direction = ranDir(gen); // Sorteia uma direção
+					            switch(enemies[i].direction){
+					                case 0: // Para cima
+					                    enemies[i].movement(mapGrid, player, hasMoved, -1);
+					                    break;
+					                case 1: // Para baixo
+					                    enemies[i].movement(mapGrid, player, hasMoved, 1);
+					                    break;
+					                case 2: // Para esquerda
+					                    enemies[i].movement(mapGrid, player, hasMoved, 0, -1);
+					                    break;
+					                case 3: // Para direita
+					                    enemies[i].movement(mapGrid, player, hasMoved, 0, 1);
+					                    break;
+					            }
+					            attempts++; // Aumenta o contador de tentativas
+					        }
+					        if (hasMoved) {
+					            mapGrid[oldX][oldY] = 0;                     // Exclui o desenho do inimigo que estava na posição anterior.
+					            mapGrid[enemies[i].x][enemies[i].y] = 5;       // Desenha o inimigo na posição nova.
+					        }
+					    }
+					}
+					enemiesMoveTimer = chrono::steady_clock::now(); // Reinicia o cronômetro
                 }
-                enemiesMoveTimer = enemiesNowTime; // Reinicia o cronômetro
             }
+			// FIM DO MOVIMENTO DOS INIMIGOS
+
+
 
              // timer da bomba depois de posicionada:
             if (bombPlaced) {
-                auto bombNowTime = chrono::steady_clock::now(); // define o tempo de AGORA
+                b1.texture = globalTimer(bombTimer, 3, bombPlaced, true);
 
-                auto bombTimePast = chrono::duration_cast<chrono::seconds>(
-                    bombNowTime - bombTimer
-                ).count(); // conta quanto tempo já passou desde o posicionamento da bomba em SEGUNDOS, de acordo com o "AGORA"
-
-                b1.texture = 3 - bombTimePast; // atualiza a textura da bomba
-
-                if (bombTimePast >= 3) { // se passarem os 3 segundos do timer:
-                    // EXPLODE
+                if (!bombPlaced) {
                     mapGrid[b1.x][b1.y] = 4;
                     isExploding = true;
                     bombCross(mapGrid[b1.x - 1][b1.y]);
@@ -361,7 +368,6 @@ int main()
                     bombCross(mapGrid[b1.x][b1.y - 1]);
                     bombCross(mapGrid[b1.x][b1.y + 1]);
 
-                    bombPlaced = false;
 
                     explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
                     cout << "\a"; // Som de EXPLOSAO (beep)
@@ -371,27 +377,19 @@ int main()
             if (isExploding) { //Duração da explosão
                 if (mapGrid[player.x][player.y] == 4) // Mata o jogador se ele andar enquanto a explosão está ativa
                     player.alive = false;
-                auto explosionNowTime = chrono::steady_clock::now(); // define o tempo de AGORA
 
-                auto explosionTimePast = chrono::duration_cast<chrono::seconds>(
-                    explosionNowTime - explosionTimer
-                ).count(); // Conta quanto tempo já passou desde a explosão da bomba em SEGUNDOS, de acordo com o "AGORA"
-
-
-                if (explosionTimePast >= 1) { // Depois de 1 seg de timer:
-                    isExploding = false; // A explosao acaba
-                }
+                globalTimer(explosionTimer, 1, isExploding);
             }
 
             for (int i = 0; i < 4; i++) {
                 if (!enemies[i].alive && mapGrid[enemies[i].x][enemies[i].y] == 6) {
-                    auto enemyDeathNowTime = chrono::steady_clock::now();
-                    auto enemyDeathTimePast = chrono::duration_cast<chrono::seconds>(
-                        enemyDeathNowTime - enemies[i].deathTimer
-                    ).count();
+                    enemies[i].deathAnimation = true;
 
-                    if (enemyDeathTimePast >= 1) // 1 segundo de caveira visível
+                    globalTimer(enemies[i].deathTimer, 1, enemies[i].deathAnimation);
+
+                    if (!enemies[i].deathAnimation) {
                         mapGrid[enemies[i].x][enemies[i].y] = 0;
+                    }
                 }
             }
 
