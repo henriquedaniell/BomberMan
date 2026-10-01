@@ -17,9 +17,7 @@ mt19937 gen(rd());
 uniform_int_distribution<> ranDir(0, 3); // Sorteador da direção que o personagem vai
 uniform_int_distribution<> ranX(1, 11); // Sorteador da casa X que o inimigo vai spawnar
 uniform_int_distribution<> ranY(1, 17); // Sorteador da casa Y que o inimigo vai spawnar
-
-// Variavel que diz se uma bomba foi colocada, e outra para o timer da explosao
-bool bombPlaced = false, isExploding = false;
+uniform_int_distribution<> distrib(0, 10); // Sorteador da parede quebrável
 
 
 // ========================================VARIAVEIS GLOBAIS=================================================
@@ -30,23 +28,6 @@ bool isExploding = false;
 int menuChoice = 0; // menu
 int score = 0; // pontuação do jogo
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
-
-struct bomb {
-    int x, y, texture = 0;
-};
-
-struct Enemy {
-    int x, y, direction=0;
-    bool alive = true;
-    chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
-};
-
-struct Character {
-    int x=1, y=1;
-    bool alive = true;
-};
-
-void bombCross(int &gridPos) { //Função da área de explosão da bomba
 
 
 // ========================================INICIO DAS STRUCTS===============================================
@@ -109,11 +90,11 @@ struct Enemy {
 // ========================================INICIO DAS FUNÇÕES===============================================
 
 // Função da área de explosão da bomba
+
 void bombCross(int &gridPos) {
 	if (gridPos == 0 || gridPos == 2 || gridPos == 5)
 		gridPos = 4;
 }
-
 
 // Função para pintar o pavio da bomba
 string bombColor(int secondsRemaining) {
@@ -158,8 +139,6 @@ void enemiesSpawn (int enemiesAmount, Enemy &enemy, Character player, int (&mapG
         enemyInPosition = true;
     }
 }
-
-    int main()
 
 
 // Função de timer global
@@ -288,6 +267,7 @@ int main()
         score = 0;
         isExploding = false;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
+        int enemiesAmount = 4;
 
         ///Mapa do Jogo: 0- Caminho livre    1- Parede Indestrutível  2- Parede destrutível   3- Bomba   4- Explosão   5- Inimigo   6- Inimigo morto
         int mapGrid[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -328,7 +308,7 @@ int main()
                 }
             }
         }
-              
+
         ///Inicialização dos inimigos e suas respectivas posições
         Enemy enemies[enemiesAmount];
         for(int i=0; i<enemiesAmount; i++){
