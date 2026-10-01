@@ -10,24 +10,37 @@
 #include <thread>
 #include <random>
 
-//Modularizar os inimigos
-
 using namespace std;
 
-// Variavel que diz se uma bomba foi colocada, e outra para o timer da explosao
-bool bombPlaced = false, isExploding = false;
+// COISAS PRA FAZER:
+// Modularizar os inimigos <--------------
+// --------------------------
+
+
+
+// ========================================VARIAVEIS GLOBAIS=================================================
+
+// Variavel para o timer da explosao
+bool isExploding = false;
 
 int menuChoice = 0; // menu
 int score = 0; // pontuação do jogo
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 
-struct bomb {
+
+
+// ========================================INICIO DAS STRUCTS===============================================
+
+// STRUCT DE BOMBAS
+struct Bomb {
     int x, y, texture = 0;
 };
 
+
+// STRUCT DE PERSONAGEM JOGADOR
 struct Character {
     int x=1, y=1;
-    bool alive = true;
+    bool alive = true, bombsPlaced = false;
 
     void movement(int gameMap[13][19], int newX = 0, int newY = 0) {
         if (gameMap[x + newX][y + newY] == 0) {
@@ -40,6 +53,8 @@ struct Character {
     }
 };
 
+
+// STRUCT DOS INIMIGOS
 struct Enemy {
     int x, y, direction=0;
     bool alive = true, deathAnimation = false;
@@ -67,13 +82,21 @@ struct Enemy {
 		gridPos = 6;
 	}
 };
+// ========================================FIM DAS STRUCTS===============================================
 
-void bombCross(int &gridPos) { //Função da área de explosão da bomba
+
+
+// ========================================INICIO DAS FUNÇÕES===============================================
+
+// Função da área de explosão da bomba
+void bombCross(int &gridPos) {
 	if (gridPos == 0 || gridPos == 2 || gridPos == 5)
 		gridPos = 4;
 }
 
-string bombColor(int secondsRemaining) { //Função para pintar o pavio da bomba
+
+// Função para pintar o pavio da bomba
+string bombColor(int secondsRemaining) {
     switch(secondsRemaining) {
         case 3: return "\033[38;5;226m";
         case 2: return "\033[38;5;208m";
@@ -83,6 +106,9 @@ string bombColor(int secondsRemaining) { //Função para pintar o pavio da bomba
     return "\033[0m";
 }
 
+
+
+// Função de timer global
 int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDuration, bool &timerTrigger, bool needTexture = false) {
 	auto nowTime = chrono::steady_clock::now(); // define o tempo de AGORA
 
@@ -100,6 +126,41 @@ int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDura
     else
         return 0;
 }
+
+void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb, bool explosionVerifier){
+	///Imprime o jogo: mapa, personagem e inimigos.
+	for(int i=0;i<13;i++){
+	    for(int j=0;j<19;j++){
+	        if(i==player.x && j==player.y){
+	            cout<< "🤠 "; //Personagem
+	        } else {
+	            switch (gameMap[i][j]){
+	                case 0: cout<<"   "; break; //Caminho
+	                case 1: cout << "\033[90m" << "███" << "\033[0m"; break; // Parede INDESTRUTÍVEL
+	                case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break; // Parede DESTRUTÍVEL
+	                case 3: cout << bombColor(bomb.texture) << "💣ʔ" << "\033[0m"; break; // Bomba
+	                case 4:
+	                    if (explosionVerifier)
+	                        cout << "\033[33m" << "💥 " << "\033[0m"; // Explosão
+	                    else {
+	                        gameMap[i][j] = 0; // Acabou a explosão, volta a ser caminho
+	                        cout<<"   ";
+	                    }
+	                break;
+
+	                case 5: cout << "👾 "; break; // Inimigo
+	                case 6: cout << "💀 "; break; // Morte do inimigo
+	                //default: cout<<"-"; //erro
+	            } //Fim switch
+	        }
+	    }
+	    cout<<"\n";
+	} //Fim for mapa
+}
+// ========================================FIM DAS FUNÇÕES=================================================
+
+
+// ===============================================INICIO DO MAIN=================================================
 
 
 int main()
@@ -147,6 +208,11 @@ int main()
 
     this_thread::sleep_for(std::chrono::seconds(2)); // Pausa de 2 segundos para então mostrar o menu
 
+
+	// Inicialização da struct Character (player)
+    Character player;
+
+
     while(menuChoice!=2){
         cout << "\033[2J\033[H"; // Apaga tudo que está no console e move o cursor para o topo
         cout << endl;
@@ -170,7 +236,7 @@ int main()
             continue;
 
         score = 0;
-        bombPlaced = false;
+        player.bombsPlaced = false;
         isExploding = false;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
 
@@ -203,14 +269,11 @@ int main()
         enemies[3].x=1;
         enemies[3].y=17;
 
-        // Inicialização da struct Character (player)
-        Character player;
-
         // Inicialização da variável que armazena o timer do movimento dos inimigos.
         auto enemiesMoveTimer = chrono::steady_clock::now();
 
         // Inicialização da struct bomba (b1)
-        bomb b1;
+        Bomb b1;
 
         // Inicialização variavel que armazena o timer da bomba
         auto bombTimer = chrono::steady_clock::now();
@@ -239,34 +302,10 @@ int main()
             ///Posiciona a escrita no início do console
             SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
-            ///Imprime o jogo: mapa, personagem e inimigos.
-            for(int i=0;i<13;i++){
-                for(int j=0;j<19;j++){
-                    if(i==player.x && j==player.y){
-                        cout<< "🤠 "; //Personagem
-                    } else {
-                        switch (mapGrid[i][j]){
-                            case 0: cout<<"   "; break; //Caminho
-                            case 1: cout << "\033[90m" << "███" << "\033[0m"; break; // Parede INDESTRUTÍVEL
-                            case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break; // Parede DESTRUTÍVEL
-                            case 3: cout << bombColor(b1.texture) << "💣ʔ" << "\033[0m"; break; // Bomba
-                            case 4:
-                                if (isExploding)
-                                    cout << "\033[33m" << "💥 " << "\033[0m"; // Explosão
-                                else {
-                                    mapGrid[i][j] = 0; // Acabou a explosão, volta a ser caminho
-                                    cout<<"   ";
-                                }
-                            break;
+            // Imprime o jogo: mapa, personagem e inimigos.
+            drawMap(mapGrid, player, b1, isExploding);
 
-                            case 5: cout << "👾 "; break; // Inimigo
-                            case 6: cout << "💀 "; break; // Morte do inimigo
-                            //default: cout<<"-"; //erro
-                        } //Fim switch
-                    }
-                }
-                cout<<"\n";
-            } //Fim for mapa
+
             cout << endl;
             cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A" << endl; // Tutorial
             cout << "                   Colocar Bomba - F" << endl;
@@ -291,13 +330,13 @@ int main()
                     break;
                     case 'f':
                         // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
-                        if (!bombPlaced) {
+                        if (!player.bombsPlaced) {
                             mapGrid[player.x][player.y] = 3;
 
                             b1.x = player.x;
                             b1.y = player.y;
 
-                            bombPlaced = true;
+                            player.bombsPlaced = true;
 
                             bombTimer = chrono::steady_clock::now(); // Define o tempo em que a bomba foi posicionada
                         }
@@ -357,10 +396,10 @@ int main()
 
 
              // timer da bomba depois de posicionada:
-            if (bombPlaced) {
-                b1.texture = globalTimer(bombTimer, 3, bombPlaced, true);
+            if (player.bombsPlaced) {
+                b1.texture = globalTimer(bombTimer, 3, player.bombsPlaced, true);
 
-                if (!bombPlaced) {
+                if (!player.bombsPlaced) {
                     mapGrid[b1.x][b1.y] = 4;
                     isExploding = true;
                     bombCross(mapGrid[b1.x - 1][b1.y]);
