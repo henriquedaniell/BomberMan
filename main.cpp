@@ -12,10 +12,14 @@
 
 using namespace std;
 
-// COISAS PRA FAZER:
-// Modularizar os inimigos <--------------
-// --------------------------
+random_device rd;
+mt19937 gen(rd());
+uniform_int_distribution<> ranDir(0, 3); // Sorteador da direção que o personagem vai
+uniform_int_distribution<> ranX(1, 11); // Sorteador da casa X que o inimigo vai spawnar
+uniform_int_distribution<> ranY(1, 17); // Sorteador da casa Y que o inimigo vai spawnar
 
+// Variavel que diz se uma bomba foi colocada, e outra para o timer da explosao
+bool bombPlaced = false, isExploding = false;
 
 
 // ========================================VARIAVEIS GLOBAIS=================================================
@@ -27,6 +31,22 @@ int menuChoice = 0; // menu
 int score = 0; // pontuação do jogo
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 
+struct bomb {
+    int x, y, texture = 0;
+};
+
+struct Enemy {
+    int x, y, direction=0;
+    bool alive = true;
+    chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
+};
+
+struct Character {
+    int x=1, y=1;
+    bool alive = true;
+};
+
+void bombCross(int &gridPos) { //Função da área de explosão da bomba
 
 
 // ========================================INICIO DAS STRUCTS===============================================
@@ -106,6 +126,40 @@ string bombColor(int secondsRemaining) {
     return "\033[0m";
 }
 
+void killEnemy(Enemy &enemy, int &score, int &gridPos) {
+    enemy.alive = false;
+    enemy.deathTimer = chrono::steady_clock::now();
+    score += 250;
+    gridPos = 6;
+}
+
+void enemiesSpawn (int enemiesAmount, Enemy &enemy, Character player, int (&mapGrid)[13][19] ){
+    bool enemyInPosition = false;
+    while (enemyInPosition == false){
+        int randomX = ranX(gen);
+        int randomY = ranY(gen);
+
+        if((abs(randomX - player.x) <= 4 || abs(randomY - player.y) <=4) || mapGrid[randomX][randomY]!=0)
+            continue;
+        else {
+            enemy.x = randomX;
+            enemy.y = randomY;
+            mapGrid[randomX][randomY] = 5;
+
+            if(mapGrid[randomX+1][randomY] != 1 && mapGrid[randomX+1][randomY] != 5)
+                mapGrid[randomX+1][randomY] = 0;
+            if(mapGrid[randomX-1][randomY] != 1 && mapGrid[randomX-1][randomY] != 5)
+                mapGrid[randomX-1][randomY] = 0;
+            if(mapGrid[randomX][randomY+1] != 1 && mapGrid[randomX][randomY+1] != 5)
+                mapGrid[randomX][randomY+1] = 0;
+            if(mapGrid[randomX][randomY-1] != 1 && mapGrid[randomX][randomY-1] != 5)
+                mapGrid[randomX][randomY-1] = 0;
+        }
+        enemyInPosition = true;
+    }
+}
+
+    int main()
 
 
 // Função de timer global
@@ -193,11 +247,6 @@ int main()
         SetConsoleMode(hOut, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
     ///FIM DO TRECHO
 
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> distrib(1, 10); // Sorteador se a parede é quebrável ou se terá nada
-    uniform_int_distribution<> ranDir(0, 3); // Sorteador da direção que o personagem vai
-
     cout << "\033[2J\033[H" << endl;
     cout << endl;
     cout << " ||===\\\\  ||==== ||\\   /||      \\\\      // || ||\\   || ||==\\\\   //==\\\\      " << endl;
@@ -206,7 +255,7 @@ int main()
     cout << " ||   \\\\  ||     ||     ||         \\\\//    || ||  \\\\|| ||   // ||    ||         " << endl;
     cout << " ||===//  ||==== ||     ||          \\/     || ||   \\|| ||==//   \\\\==//            " << endl;
 
-    this_thread::sleep_for(std::chrono::seconds(2)); // Pausa de 2 segundos para então mostrar o menu
+    this_thread::sleep_for(chrono::seconds(2)); // Pausa de 2 segundos para então mostrar o menu
 
 
 	// Inicialização da struct Character (player)
@@ -241,33 +290,19 @@ int main()
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
 
         ///Mapa do Jogo: 0- Caminho livre    1- Parede Indestrutível  2- Parede destrutível   3- Bomba   4- Explosão   5- Inimigo   6- Inimigo morto
-        int mapGrid[13][19]={ 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-                        1,0,0,0,2,0,2,2,2,2,2,0,2,2,2,2,0,5,1,
-                        1,0,1,2,1,2,1,0,1,0,1,2,1,0,1,2,1,0,1,
-                        1,2,2,2,0,2,2,2,0,2,2,2,0,2,2,2,0,2,1,
-                        1,0,1,2,1,0,1,2,1,2,1,2,1,0,1,0,1,2,1,
-                        1,2,2,0,2,2,2,2,2,0,2,0,2,2,0,2,2,0,1,
-                        1,0,1,2,1,2,1,0,1,5,1,2,1,0,1,2,1,2,1,
-                        1,2,2,2,2,0,2,0,2,0,2,2,0,2,2,2,2,2,1,
-                        1,0,1,2,1,2,1,2,1,2,1,2,1,0,1,0,1,2,1,
-                        1,2,2,0,2,2,0,2,0,2,2,0,2,2,0,0,2,2,1,
-                        1,0,1,2,1,0,1,0,1,2,1,2,1,2,1,2,1,0,1,
-                        1,5,0,2,0,2,2,2,2,0,2,2,2,2,2,2,0,5,1,
-                        1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
-
-        ///Inicialização dos inimigos e suas respectivas posições
-        Enemy enemies[4];
-        enemies[0].x=11;
-        enemies[0].y=1;
-
-        enemies[1].x=6;
-        enemies[1].y=9;
-
-        enemies[2].x=11;
-        enemies[2].y=17;
-
-        enemies[3].x=1;
-        enemies[3].y=17;
+        int mapGrid[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+                                1,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+                                1,0,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+                                1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+                                1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+                                1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+                                1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
+                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+                                1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
         // Inicialização da variável que armazena o timer do movimento dos inimigos.
         auto enemiesMoveTimer = chrono::steady_clock::now();
@@ -292,6 +327,12 @@ int main()
                     }
                 }
             }
+        }
+              
+        ///Inicialização dos inimigos e suas respectivas posições
+        Enemy enemies[enemiesAmount];
+        for(int i=0; i<enemiesAmount; i++){
+            enemiesSpawn(enemiesAmount, enemies[i], player, mapGrid);
         }
 
         //Variavel para tecla pressionada
@@ -352,7 +393,7 @@ int main()
                 globalTimer(enemiesMoveTimer, 1, cannotMoveYet);
 
                 if (!cannotMoveYet) {
-                    for(int i=0; i<4; i++){ // Processamento dos 4 inimigos
+                    for(int i=0; i<enemiesAmount; i++){ // Processamento dos 4 inimigos
 
 					    if (enemies[i].alive) {
 					        if (mapGrid[enemies[i].x][enemies[i].y] == 4){ // Se está na explosão, ele morre
@@ -411,6 +452,7 @@ int main()
                     explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
                     cout << "\a"; // Som de EXPLOSAO (beep)
                 }
+
             }
 
             if (isExploding) { //Duração da explosão
@@ -420,7 +462,7 @@ int main()
                 globalTimer(explosionTimer, 1, isExploding);
             }
 
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < enemiesAmount; i++) {
                 if (!enemies[i].alive && mapGrid[enemies[i].x][enemies[i].y] == 6) {
                     enemies[i].deathAnimation = true;
 
