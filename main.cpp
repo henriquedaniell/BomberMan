@@ -235,8 +235,8 @@ int main()
         if(menuChoice!=1) //Enquanto não escolher 1, fica pedindo para escolher uma opção, caso escolha 2, irá encerrar.
             continue;
 
+        player.x = 1, player.y = 1, player.alive = true, player.bombsPlaced = false;
         score = 0;
-        player.bombsPlaced = false;
         isExploding = false;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
 
