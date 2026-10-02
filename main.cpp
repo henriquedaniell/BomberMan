@@ -17,7 +17,7 @@ mt19937 gen(rd());
 uniform_int_distribution<> ranDir(0, 3); // Sorteador da direção que o personagem vai
 uniform_int_distribution<> ranX(1, 11); // Sorteador da casa X que o inimigo vai spawnar
 uniform_int_distribution<> ranY(1, 17); // Sorteador da casa Y que o inimigo vai spawnar
-uniform_int_distribution<> distrib(0, 10); // Sorteador da parede quebrável
+uniform_int_distribution<> distrib(1, 100); // Sorteador da parede quebrável
 
 
 // ========================================VARIAVEIS GLOBAIS=================================================
@@ -106,37 +106,56 @@ string bombColor(int secondsRemaining) {
     return "\033[0m";
 }
 
-void killEnemy(Enemy &enemy, int &score, int &gridPos) {
-    enemy.alive = false;
-    enemy.deathTimer = chrono::steady_clock::now();
-    score += 250;
-    gridPos = 6;
-}
-
 void enemiesSpawn (int enemiesAmount, Enemy &enemy, Character player, int (&mapGrid)[13][19] ){
     bool enemyInPosition = false;
     while (enemyInPosition == false){
         int randomX = ranX(gen);
         int randomY = ranY(gen);
 
-        if((abs(randomX - player.x) <= 4 || abs(randomY - player.y) <=4) || mapGrid[randomX][randomY]!=0)
+        if((abs(randomX - player.x) + abs(randomY - player.y) <=4) || mapGrid[randomX][randomY]!=9)
             continue;
         else {
             enemy.x = randomX;
             enemy.y = randomY;
             mapGrid[randomX][randomY] = 5;
 
-            if(mapGrid[randomX+1][randomY] != 1 && mapGrid[randomX+1][randomY] != 5)
+            if(mapGrid[randomX+1][randomY] == 9)
                 mapGrid[randomX+1][randomY] = 0;
-            if(mapGrid[randomX-1][randomY] != 1 && mapGrid[randomX-1][randomY] != 5)
+            if(mapGrid[randomX-1][randomY] == 9)
                 mapGrid[randomX-1][randomY] = 0;
-            if(mapGrid[randomX][randomY+1] != 1 && mapGrid[randomX][randomY+1] != 5)
+            if(mapGrid[randomX][randomY+1] == 9)
                 mapGrid[randomX][randomY+1] = 0;
-            if(mapGrid[randomX][randomY-1] != 1 && mapGrid[randomX][randomY-1] != 5)
+            if(mapGrid[randomX][randomY-1] == 9)
                 mapGrid[randomX][randomY-1] = 0;
         }
         enemyInPosition = true;
     }
+}
+
+///Sorteio das paredes que serão destrutíveis
+void wallsGeneration(int (&gameMap)[13][19]) {
+	int randomWallGen = 0;
+	for(int i=0; i<13; i++){
+		for(int j=0; j<19; j++){
+			if(gameMap[i][j]==9){
+				randomWallGen = distrib(gen);
+				if(randomWallGen>35){
+					gameMap[i][j] = 0;
+				} else {
+					gameMap[i][j] = 2;
+				}
+			}
+		}
+	}
+}
+
+
+void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19]) {
+	for(int i=0; i<enemiesAmount; i++){
+	    enemiesSpawn(enemiesAmount, enemies[i], player, gameMap);
+	}
+
+	wallsGeneration(gameMap);
 }
 
 
@@ -191,46 +210,43 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb, bool explosion
 }
 
 bool menu(){
-    int menuChoice = 0; // menu
-    cout << "\033[2J\033[H"; // Apaga tudo que está no console e move o cursor para o topo
-    cout << endl;
-    cout <<     "         BOMBERMAN          " << endl;
-    cout <<     " ========================== " << endl;
-    cout <<     "||                        ||" << endl;
+    while (true) {
+        int menuChoice = 0; // menu
+        cout << "\033[2J\033[H"; // Apaga tudo que está no console e move o cursor para o topo
+        cout << endl;
+        cout <<     "         BOMBERMAN          " << endl;
+        cout <<     " ========================== " << endl;
+        cout <<     "||                        ||" << endl;
 
-    if(alreadyPlayed == false){
-        cout << "||       1- Jogar         ||" << endl;
-    } else {
-        cout << "||   1- Jogar Novamente   ||" << endl;
-    }
-    cout <<     "||     2- Instruções      ||" << endl;
-    cout <<     "||      3- Créditos       ||" << endl;
-    cout <<     "||       4- Sair          ||" << endl;
-    cout <<     "||                        ||" << endl;
-    cout <<     " ========================== " << endl;
-    cout <<     "     ESCOLHA UMA OPCAO: ";
-    cin >> menuChoice;
+        if(alreadyPlayed == false){
+            cout << "||       1- Jogar         ||" << endl;
+        } else {
+            cout << "||   1- Jogar Novamente   ||" << endl;
+        }
+        cout <<     "||     2- Instruções      ||" << endl;
+        cout <<     "||      3- Créditos       ||" << endl;
+        cout <<     "||       4- Sair          ||" << endl;
+        cout <<     "||                        ||" << endl;
+        cout <<     " ========================== " << endl;
+        cout <<     "     ESCOLHA UMA OPCAO: ";
+        cin >> menuChoice;
 
-    switch(menuChoice){
-    case 1:
-        return true;
-        break;
-    case 2:
-        instructions();
-        break;
-    case 3:
-        credits();
-        break;
-    case 4:
-        return false;
-        break;
-    default:
-        menu();
-        break;
+        if (cin.fail()) {          // se usuário digitou letra, ignora e tenta dnv
+            cin.clear();
+            cin.ignore(10000, '\n');
+            continue;
+        }
+
+        switch(menuChoice){
+        case 1: return true;
+        case 2: /*instructions(); */    break;
+        case 3: /*credits(); */         break;
+        case 4: return false;
+        }
     }
 }
-
-void instruction(){
+/*
+void instructions(){
     cout << "\033[2J\033[H"; // Apaga tudo que está no console e move o cursor para o topo
     cout << endl;
     cout <<     "         BOMBERMAN          " << endl;
@@ -270,17 +286,14 @@ void credits(){
     cout <<     "Aperte ENTER para voltar ao menu!";
     getch();
     menu();
-}
-
-
+} */
 // ========================================FIM DAS FUNÇÕES=================================================
 
 
 // ===============================================INICIO DO MAIN=================================================
 
 
-int main()
-{
+int main() {
 
     ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
         //INICIO: COMANDOS PARA QUE O CURSOR NAO FIQUE PISCANDO NA TELA
@@ -328,21 +341,21 @@ int main()
         score = 0;
         isExploding = false;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
-        int enemiesAmount = 4;
+        int enemiesAmount = 5;
 
         ///Mapa do Jogo: 0- Caminho livre    1- Parede Indestrutível  2- Parede destrutível   3- Bomba   4- Explosão   5- Inimigo   6- Inimigo morto
         int mapGrid[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-                                1,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
-                                1,0,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
-                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
-                                1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
-                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
-                                1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
-                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
-                                1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
-                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
-                                1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,
-                                1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,
+                                1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
+                                1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
+                                1,2,9,2,9,9,9,2,9,9,2,9,9,9,9,9,9,9,1,
+                                1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,
+                                1,2,9,9,9,2,9,9,2,9,9,2,9,9,9,9,2,9,1,
+                                1,9,1,9,1,9,1,9,1,9,1,9,1,2,1,9,1,9,1,
+                                1,9,9,9,9,2,9,9,9,9,9,9,9,9,9,9,9,9,1,
+                                1,9,1,9,1,9,1,9,1,9,1,9,1,2,1,9,1,9,1,
+                                1,9,9,2,9,9,9,9,9,2,9,9,9,9,2,9,9,9,1,
+                                1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,
+                                1,9,9,2,9,9,9,9,9,9,2,9,9,9,9,9,9,9,1,
                                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
         // Inicialização da variável que armazena o timer do movimento dos inimigos.
@@ -357,24 +370,10 @@ int main()
         // Inicialização variavel que armazena o timer da explosao
         auto explosionTimer = chrono::steady_clock::now();
 
-        ///Sorteio das paredes que serão destrutíveis
-        int randomWallGen = 0;
-        for(int i=0; i<13; i++){
-            for(int j=0; j<19; j++){
-                if(mapGrid[i][j]==2){
-                    randomWallGen = distrib(gen);
-                    if(randomWallGen>6){
-                        mapGrid[i][j]=0;
-                    }
-                }
-            }
-        }
-
         ///Inicialização dos inimigos e suas respectivas posições
         Enemy enemies[enemiesAmount];
-        for(int i=0; i<enemiesAmount; i++){
-            enemiesSpawn(enemiesAmount, enemies[i], player, mapGrid);
-        }
+
+        mapGeneration(enemiesAmount, enemies, player, mapGrid);
 
         //Variavel para tecla pressionada
         char keyPressed;
@@ -489,6 +488,10 @@ int main()
                     bombCross(mapGrid[b1.x][b1.y - 1]);
                     bombCross(mapGrid[b1.x][b1.y + 1]);
 
+                    for (int i = 0; i < enemiesAmount; i++) {
+                        if (enemies[i].alive && mapGrid[enemies[i].x][enemies[i].y] == 4)
+                            enemies[i].death(mapGrid[enemies[i].x][enemies[i].y]);
+                    }
 
                     explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
                     cout << "\a"; // Som de EXPLOSAO (beep)
