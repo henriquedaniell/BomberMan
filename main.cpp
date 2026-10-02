@@ -15,8 +15,8 @@ using namespace std;
 random_device rd;
 mt19937 gen(rd());
 uniform_int_distribution<> ranDir(0, 3); // Sorteador da direção que o personagem vai
-uniform_int_distribution<> ranX(1, 11); // Sorteador da casa X que o inimigo vai spawnar
-uniform_int_distribution<> ranY(1, 17); // Sorteador da casa Y que o inimigo vai spawnar
+uniform_int_distribution<> ranX(1, 17); // Sorteador da casa X que o inimigo vai spawnar
+uniform_int_distribution<> ranY(1, 11); // Sorteador da casa Y que o inimigo vai spawnar
 uniform_int_distribution<> distrib(1, 100); // Sorteador da parede quebrável
 
 
@@ -39,15 +39,15 @@ struct Bomb {
 
 // STRUCT DE PERSONAGEM JOGADOR
 struct Character {
-    int x=1, y=1;
+    int x=1, y=1, maxConcurrentBombs;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
     bool alive = true, bombsPlaced = false;
 
     void movement(int gameMap[13][19], int newX = 0, int newY = 0) {
-        if (gameMap[x + newX][y + newY] == 0) {
+        if (gameMap[y + newY][x + newX] == 0) {
             x += newX;           // Move o player caso haja caminho livre
             y += newY;
         }
-        else if(gameMap[x + newX][y + newY] == 5 || gameMap[x + newX][y + newY] == 4) {
+        else if(gameMap[y + newY][x + newX] == 5 || gameMap[y + newY][x + newX] == 4) {
             alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
         }
     }
@@ -63,15 +63,15 @@ struct Enemy {
 	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int newX = 0, int newY = 0) {
 		if (x + newX == player.x && y + newY == player.y) 	// Mata o player se o inimigo encostar nele
 		    player.alive = false;
-		else if (gameMap[x + newX][y + newY] == 0){ 				// Move o inimigo para o novo local caso seja caminho livre
+		else if (gameMap[y + newY][x + newX] == 0){ 				// Move o inimigo para o novo local caso seja caminho livre
 		    x += newX;
 			y += newY;
 		    hasMoved = true;
-		} else if(gameMap[x + newX][y + newY] == 4){ // Se for explosão
-		    gameMap[x][y] = 0;    // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
+		} else if(gameMap[y + newY][x + newX] == 4){ // Se for explosão
+		    gameMap[y][x] = 0;    // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
 		    x += newX;                     // Inimigo anda
 			y += newY;
-		    death(gameMap[x][y]);
+		    death(gameMap[y][x]);
 		}
 	}
 
@@ -112,21 +112,21 @@ void enemiesSpawn (int enemiesAmount, Enemy &enemy, Character player, int (&mapG
         int randomX = ranX(gen);
         int randomY = ranY(gen);
 
-        if((abs(randomX - player.x) + abs(randomY - player.y) <=4) || mapGrid[randomX][randomY]!=9)
+        if((abs(randomX - player.x) + abs(randomY - player.y) <=4) || mapGrid[randomY][randomX]!=9)
             continue;
         else {
             enemy.x = randomX;
             enemy.y = randomY;
-            mapGrid[randomX][randomY] = 5;
+            mapGrid[randomY][randomX] = 5;
 
-            if(mapGrid[randomX+1][randomY] == 9)
-                mapGrid[randomX+1][randomY] = 0;
-            if(mapGrid[randomX-1][randomY] == 9)
-                mapGrid[randomX-1][randomY] = 0;
-            if(mapGrid[randomX][randomY+1] == 9)
-                mapGrid[randomX][randomY+1] = 0;
-            if(mapGrid[randomX][randomY-1] == 9)
-                mapGrid[randomX][randomY-1] = 0;
+            if(mapGrid[randomY+1][randomX] == 9)
+                mapGrid[randomY+1][randomX] = 0;
+            if(mapGrid[randomY-1][randomX] == 9)
+                mapGrid[randomY-1][randomX] = 0;
+            if(mapGrid[randomY][randomX+1] == 9)
+                mapGrid[randomY][randomX+1] = 0;
+            if(mapGrid[randomY][randomX-1] == 9)
+                mapGrid[randomY][randomX-1] = 0;
         }
         enemyInPosition = true;
     }
@@ -182,7 +182,7 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb, bool explosion
 	///Imprime o jogo: mapa, personagem e inimigos.
 	for(int i=0;i<13;i++){
 	    for(int j=0;j<19;j++){
-	        if(i==player.x && j==player.y){
+	        if(i==player.y && j==player.x){
 	            cout<< "🤠 "; //Personagem
 	        } else {
 	            switch (gameMap[i][j]){
@@ -379,7 +379,7 @@ int main() {
         char keyPressed;
 
         //Começa o jogo de verdade
-        while(player.alive && score<1000){ //Condição de VITÓRIA: 1000 PONTOS. Condição de DERROTA: MORRER
+        while(player.alive && score < enemiesAmount * 250){ //Condição de VITÓRIA: Matar todos inimigos. Condição de DERROTA: MORRER
             ///Posiciona a escrita no início do console
             SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
@@ -398,21 +398,21 @@ int main() {
                 switch(keyPressed)
                 {
                     case 72: case 'w': /// Cima
-                        player.movement(mapGrid, -1);
-                    break;
-                    case 80: case 's': /// Baixo
-                        player.movement(mapGrid, 1);
-                    break;
-                    case 75:case 'a': /// Esquerda
                         player.movement(mapGrid, 0, -1);
                     break;
-                    case 77: case 'd': /// Direita
+                    case 80: case 's': /// Baixo
                         player.movement(mapGrid, 0, 1);
+                    break;
+                    case 75:case 'a': /// Esquerda
+                        player.movement(mapGrid, -1);
+                    break;
+                    case 77: case 'd': /// Direita
+                        player.movement(mapGrid, 1);
                     break;
                     case 'f':
                         // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
                         if (!player.bombsPlaced) {
-                            mapGrid[player.x][player.y] = 3;
+                            mapGrid[player.y][player.x] = 3;
 
                             b1.x = player.x;
                             b1.y = player.y;
@@ -436,8 +436,8 @@ int main() {
                     for(int i=0; i<enemiesAmount; i++){ // Processamento dos 4 inimigos
 
 					    if (enemies[i].alive) {
-					        if (mapGrid[enemies[i].x][enemies[i].y] == 4){ // Se está na explosão, ele morre
-					            enemies[i].death(mapGrid[enemies[i].x][enemies[i].y]);
+					        if (mapGrid[enemies[i].y][enemies[i].x] == 4){ // Se está na explosão, ele morre
+					            enemies[i].death(mapGrid[enemies[i].y][enemies[i].x]);
 					        }
 
 					        bool hasMoved = false;
@@ -449,23 +449,23 @@ int main() {
 					            enemies[i].direction = ranDir(gen); // Sorteia uma direção
 					            switch(enemies[i].direction){
 					                case 0: // Para cima
-					                    enemies[i].movement(mapGrid, player, hasMoved, -1);
-					                    break;
-					                case 1: // Para baixo
-					                    enemies[i].movement(mapGrid, player, hasMoved, 1);
-					                    break;
-					                case 2: // Para esquerda
 					                    enemies[i].movement(mapGrid, player, hasMoved, 0, -1);
 					                    break;
-					                case 3: // Para direita
+					                case 1: // Para baixo
 					                    enemies[i].movement(mapGrid, player, hasMoved, 0, 1);
+					                    break;
+					                case 2: // Para esquerda
+					                    enemies[i].movement(mapGrid, player, hasMoved, -1);
+					                    break;
+					                case 3: // Para direita
+					                    enemies[i].movement(mapGrid, player, hasMoved, 1);
 					                    break;
 					            }
 					            attempts++; // Aumenta o contador de tentativas
 					        }
 					        if (hasMoved) {
-					            mapGrid[oldX][oldY] = 0;                     // Exclui o desenho do inimigo que estava na posição anterior.
-					            mapGrid[enemies[i].x][enemies[i].y] = 5;       // Desenha o inimigo na posição nova.
+					            mapGrid[oldY][oldX] = 0;                     // Exclui o desenho do inimigo que estava na posição anterior.
+					            mapGrid[enemies[i].y][enemies[i].x] = 5;       // Desenha o inimigo na posição nova.
 					        }
 					    }
 					}
@@ -481,16 +481,16 @@ int main() {
                 b1.texture = globalTimer(bombTimer, 3, player.bombsPlaced, true);
 
                 if (!player.bombsPlaced) {
-                    mapGrid[b1.x][b1.y] = 4;
+                    mapGrid[b1.y][b1.x] = 4;
                     isExploding = true;
-                    bombCross(mapGrid[b1.x - 1][b1.y]);
-                    bombCross(mapGrid[b1.x + 1][b1.y]);
-                    bombCross(mapGrid[b1.x][b1.y - 1]);
-                    bombCross(mapGrid[b1.x][b1.y + 1]);
+                    bombCross(mapGrid[b1.y - 1][b1.x]);
+                    bombCross(mapGrid[b1.y + 1][b1.x]);
+                    bombCross(mapGrid[b1.y][b1.x - 1]);
+                    bombCross(mapGrid[b1.y][b1.x + 1]);
 
                     for (int i = 0; i < enemiesAmount; i++) {
-                        if (enemies[i].alive && mapGrid[enemies[i].x][enemies[i].y] == 4)
-                            enemies[i].death(mapGrid[enemies[i].x][enemies[i].y]);
+                        if (enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 4)
+                            enemies[i].death(mapGrid[enemies[i].y][enemies[i].x]);
                     }
 
                     explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
@@ -500,20 +500,20 @@ int main() {
             }
 
             if (isExploding) { //Duração da explosão
-                if (mapGrid[player.x][player.y] == 4) // Mata o jogador se ele andar enquanto a explosão está ativa
+                if (mapGrid[player.y][player.x] == 4) // Mata o jogador se ele andar enquanto a explosão está ativa
                     player.alive = false;
 
                 globalTimer(explosionTimer, 1, isExploding);
             }
 
             for (int i = 0; i < enemiesAmount; i++) {
-                if (!enemies[i].alive && mapGrid[enemies[i].x][enemies[i].y] == 6) {
+                if (!enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 6) {
                     enemies[i].deathAnimation = true;
 
                     globalTimer(enemies[i].deathTimer, 1, enemies[i].deathAnimation);
 
                     if (!enemies[i].deathAnimation) {
-                        mapGrid[enemies[i].x][enemies[i].y] = 0;
+                        mapGrid[enemies[i].y][enemies[i].x] = 0;
                     }
                 }
             }
@@ -523,7 +523,7 @@ int main() {
         ///Mensagem de fim de jogo
         if(player.alive == false)
             cout << "       Você morreu..." << endl;
-        else if(score == 1000)
+        else if(score >= enemiesAmount * 250)
             cout << "       Parabéns! Você matou todos os INIMIGOS! 🏅" << endl;
 
         cout << "       Aperte uma tecla para voltar ao Menu.";
