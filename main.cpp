@@ -24,9 +24,8 @@ uniform_int_distribution<> distrib(0, 10); // Sorteador da parede quebrável
 
 // Variavel para o timer da explosao
 bool isExploding = false;
-
-int menuChoice = 0; // menu
 int score = 0; // pontuação do jogo
+int difficulty = 0;
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 
 
@@ -190,6 +189,90 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb, bool explosion
 	    cout<<"\n";
 	} //Fim for mapa
 }
+
+bool menu(){
+    int menuChoice = 0; // menu
+    cout << "\033[2J\033[H"; // Apaga tudo que está no console e move o cursor para o topo
+    cout << endl;
+    cout <<     "         BOMBERMAN          " << endl;
+    cout <<     " ========================== " << endl;
+    cout <<     "||                        ||" << endl;
+
+    if(alreadyPlayed == false){
+        cout << "||       1- Jogar         ||" << endl;
+    } else {
+        cout << "||   1- Jogar Novamente   ||" << endl;
+    }
+    cout <<     "||     2- Instruções      ||" << endl;
+    cout <<     "||      3- Créditos       ||" << endl;
+    cout <<     "||       4- Sair          ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     " ========================== " << endl;
+    cout <<     "     ESCOLHA UMA OPCAO: ";
+    cin >> menuChoice;
+
+    switch(menuChoice){
+    case 1:
+        return true;
+        break;
+    case 2:
+        instructions();
+        break;
+    case 3:
+        credits();
+        break;
+    case 4:
+        return false;
+        break;
+    default:
+        menu();
+        break;
+    }
+}
+
+void instruction(){
+    cout << "\033[2J\033[H"; // Apaga tudo que está no console e move o cursor para o topo
+    cout << endl;
+    cout <<     "         BOMBERMAN          " << endl;
+    cout <<     " ========================== " << endl;
+    cout <<     "||  Bem-vindo ao BomberMan!                      ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     "||                        ||" << endl;
+    cout <<     " ========================== " << endl;
+    cout <<     "     ESCOLHA UMA OPCAO: ";
+    getch();
+    menu();
+}
+
+void credits(){
+    cout << "\033[2J\033[H"; // Apaga tudo que está no console e move o cursor para o topo
+    cout << endl;
+    cout <<     "             CRÉDITOS          " << endl;
+    cout <<     " ================================" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     "||                              ||" << endl;
+    cout <<     " ================================ " << endl;
+    cout <<     "Aperte ENTER para voltar ao menu!";
+    getch();
+    menu();
+}
+
+
 // ========================================FIM DAS FUNÇÕES=================================================
 
 
@@ -240,29 +323,7 @@ int main()
 	// Inicialização da struct Character (player)
     Character player;
 
-
-    while(menuChoice!=2){
-        cout << "\033[2J\033[H"; // Apaga tudo que está no console e move o cursor para o topo
-        cout << endl;
-        cout << "         BOMBERMAN          " << endl;
-        cout << " ========================== " << endl;
-        cout << "||                        ||" << endl;
-
-        if(alreadyPlayed == false){
-            cout << "||       1- Jogar         ||" << endl;
-        } else {
-            cout << "||   1- Jogar Novamente   ||" << endl;
-        }
-
-        cout << "||       2- Sair          ||" << endl;
-        cout << "||                        ||" << endl;
-        cout << " ========================== " << endl;
-        cout << "     ESCOLHA UMA OPCAO: ";
-        cin >> menuChoice;
-
-        if(menuChoice!=1) //Enquanto não escolher 1, fica pedindo para escolher uma opção, caso escolha 2, irá encerrar.
-            continue;
-
+    while(menu()){
         player.x = 1, player.y = 1, player.alive = true, player.bombsPlaced = false;
         score = 0;
         isExploding = false;
