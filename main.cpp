@@ -34,14 +34,18 @@ struct Bomb {
     int x, y, texture = 0;
     bool placed = false;
 
-    // Variavel para o timer da explosao
-    bool isExploding = false;
 
     // Inicialização variavel que armazena o timer da bomba
     chrono::steady_clock::time_point bombTimer = chrono::steady_clock::now();
 
     // Inicialização variavel que armazena o timer da explosao
     chrono::steady_clock::time_point explosionTimer = chrono::steady_clock::now();
+	
+	
+	struct Explosion {
+		int x, y;
+		bool isExploding = false; // Variavel para o timer da explosao
+	};
 };
 
 
@@ -67,7 +71,8 @@ struct Enemy {
     int x, y, direction=0;
     bool alive = true, deathAnimation = false;
     chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
-
+	
+	
 	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int newX = 0, int newY = 0) {
 		if (x + newX == player.x && y + newY == player.y) 	// Mata o player se o inimigo encostar nele
 		    player.alive = false;
