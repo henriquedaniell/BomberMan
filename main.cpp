@@ -22,8 +22,6 @@ uniform_int_distribution<> distrib(1, 100); // Sorteador da parede quebrável
 
 // ========================================VARIAVEIS GLOBAIS=================================================
 
-// Variavel para o timer da explosao
-bool isExploding = false;
 int score = 0; // pontuação do jogo
 int difficulty = 0;
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
@@ -34,13 +32,23 @@ bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 // STRUCT DE BOMBAS
 struct Bomb {
     int x, y, texture = 0;
+    bool placed = false;
+
+    // Variavel para o timer da explosao
+    bool isExploding = false;
+
+    // Inicialização variavel que armazena o timer da bomba
+    chrono::steady_clock::time_point bombTimer = chrono::steady_clock::now();
+
+    // Inicialização variavel que armazena o timer da explosao
+    chrono::steady_clock::time_point explosionTimer = chrono::steady_clock::now();
 };
 
 
 // STRUCT DE PERSONAGEM JOGADOR
 struct Character {
-    int x=1, y=1, maxConcurrentBombs;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
-    bool alive = true, bombsPlaced = false;
+    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
+    bool alive = true;
 
     void movement(int gameMap[13][19], int newX = 0, int newY = 0) {
         if (gameMap[y + newY][x + newX] == 0) {
@@ -178,7 +186,7 @@ int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDura
         return 0;
 }
 
-void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb, bool explosionVerifier){
+void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	///Imprime o jogo: mapa, personagem e inimigos.
 	for(int i=0;i<13;i++){
 	    for(int j=0;j<19;j++){
@@ -189,16 +197,16 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb, bool explosion
 	                case 0: cout<<"   "; break; //Caminho
 	                case 1: cout << "\033[90m" << "███" << "\033[0m"; break; // Parede INDESTRUTÍVEL
 	                case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break; // Parede DESTRUTÍVEL
-	                case 3: cout << bombColor(bomb.texture) << "💣ʔ" << "\033[0m"; break; // Bomba
-	                case 4:
-	                    if (explosionVerifier)
-	                        cout << "\033[33m" << "💥 " << "\033[0m"; // Explosão
-	                    else {
-	                        gameMap[i][j] = 0; // Acabou a explosão, volta a ser caminho
-	                        cout<<"   ";
+	                case 3: {
+						int tex = 0;
+	                    for (int k = 0; k < player.maxConcurrentBombs; k++) {
+                            if (bomb[k].placed && i == bomb[k].y && j == bomb[k].x)
+                                tex = bomb[k].texture;
 	                    }
-	                break;
-
+						cout << bombColor(tex) << "💣ʔ" << "\033[0m";
+                    break;
+                    }
+	                case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break; // Explosão
 	                case 5: cout << "👾 "; break; // Inimigo
 	                case 6: cout << "💀 "; break; // Morte do inimigo
 	                //default: cout<<"-"; //erro
@@ -334,12 +342,11 @@ int main() {
 
 
 	// Inicialização da struct Character (player)
-    Character player;
+    Character player{.maxConcurrentBombs = 1};
 
     while(menu()){
-        player.x = 1, player.y = 1, player.alive = true, player.bombsPlaced = false;
+        player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0;
         score = 0;
-        isExploding = false;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
         int enemiesAmount = 5;
 
@@ -361,14 +368,8 @@ int main() {
         // Inicialização da variável que armazena o timer do movimento dos inimigos.
         auto enemiesMoveTimer = chrono::steady_clock::now();
 
-        // Inicialização da struct bomba (b1)
-        Bomb b1;
-
-        // Inicialização variavel que armazena o timer da bomba
-        auto bombTimer = chrono::steady_clock::now();
-
-        // Inicialização variavel que armazena o timer da explosao
-        auto explosionTimer = chrono::steady_clock::now();
+        // Inicialização da struct de bombas
+        Bomb bombs[5];
 
         ///Inicialização dos inimigos e suas respectivas posições
         Enemy enemies[enemiesAmount];
@@ -384,7 +385,7 @@ int main() {
             SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
             // Imprime o jogo: mapa, personagem e inimigos.
-            drawMap(mapGrid, player, b1, isExploding);
+            drawMap(mapGrid, player, bombs);
 
 
             cout << endl;
@@ -411,15 +412,20 @@ int main() {
                     break;
                     case 'f':
                         // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
-                        if (!player.bombsPlaced) {
+                        if (player.totalBombsPlaced < player.maxConcurrentBombs && mapGrid[player.y][player.x] != 3) {
                             mapGrid[player.y][player.x] = 3;
 
-                            b1.x = player.x;
-                            b1.y = player.y;
+                            for (int k = 0; k < player.maxConcurrentBombs; k++) {
+                                if (!bombs[k].placed && !bombs[k].isExploding) {
+                                    bombs[k].x = player.x;
+                                    bombs[k].y = player.y;
+                                    bombs[k].placed = true;
+                                    bombs[k].bombTimer = chrono::steady_clock::now(); // Define o tempo em que a bomba foi posicionada
+                                    break;
+                                }
+                            }
 
-                            player.bombsPlaced = true;
-
-                            bombTimer = chrono::steady_clock::now(); // Define o tempo em que a bomba foi posicionada
+                            player.totalBombsPlaced++;
                         }
                     break;
                 }
@@ -477,33 +483,47 @@ int main() {
 
 
              // timer da bomba depois de posicionada:
-            if (player.bombsPlaced) {
-                b1.texture = globalTimer(bombTimer, 3, player.bombsPlaced, true);
+             for (int k = 0; k < player.maxConcurrentBombs; k++) {
+                if (bombs[k].placed) {
+                    bombs[k].texture = globalTimer(bombs[k].bombTimer, 3, bombs[k].placed, true);
 
-                if (!player.bombsPlaced) {
-                    mapGrid[b1.y][b1.x] = 4;
-                    isExploding = true;
-                    bombCross(mapGrid[b1.y - 1][b1.x]);
-                    bombCross(mapGrid[b1.y + 1][b1.x]);
-                    bombCross(mapGrid[b1.y][b1.x - 1]);
-                    bombCross(mapGrid[b1.y][b1.x + 1]);
+                    if (!bombs[k].placed) {
+                        mapGrid[bombs[k].y][bombs[k].x] = 4;
+                        bombs[k].isExploding = true;
+                        bombCross(mapGrid[bombs[k].y - 1][bombs[k].x]);
+                        bombCross(mapGrid[bombs[k].y + 1][bombs[k].x]);
+                        bombCross(mapGrid[bombs[k].y][bombs[k].x - 1]);
+                        bombCross(mapGrid[bombs[k].y][bombs[k].x + 1]);
 
-                    for (int i = 0; i < enemiesAmount; i++) {
-                        if (enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 4)
-                            enemies[i].death(mapGrid[enemies[i].y][enemies[i].x]);
+                        for (int i = 0; i < enemiesAmount; i++) {
+                            if (enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 4)
+                                enemies[i].death(mapGrid[enemies[i].y][enemies[i].x]);
+                        }
+
+                        bombs[k].explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
+                        cout << "\a"; // Som de EXPLOSAO (beep)
                     }
-
-                    explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
-                    cout << "\a"; // Som de EXPLOSAO (beep)
                 }
-
             }
 
-            if (isExploding) { //Duração da explosão
-                if (mapGrid[player.y][player.x] == 4) // Mata o jogador se ele andar enquanto a explosão está ativa
-                    player.alive = false;
+            for (int k = 0; k < player.maxConcurrentBombs; k++) {
+                if (bombs[k].isExploding) { //Duração da explosão
+                    if (mapGrid[player.y][player.x] == 4) // Mata o jogador se ele andar enquanto a explosão está ativa
+                        player.alive = false;
 
-                globalTimer(explosionTimer, 1, isExploding);
+                    globalTimer(bombs[k].explosionTimer, 1, bombs[k].isExploding);
+
+                    if (!bombs[k].isExploding) { // acabou a explosão DESTA bomba
+                        int bx = bombs[k].x, by = bombs[k].y;
+                        if (mapGrid[by][bx]     == 4) mapGrid[by][bx]     = 0;
+                        if (mapGrid[by-1][bx]   == 4) mapGrid[by-1][bx]   = 0;
+                        if (mapGrid[by+1][bx]   == 4) mapGrid[by+1][bx]   = 0;
+                        if (mapGrid[by][bx-1]   == 4) mapGrid[by][bx-1]   = 0;
+                        if (mapGrid[by][bx+1]   == 4) mapGrid[by][bx+1]   = 0;
+
+						if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
+                    }
+                }
             }
 
             for (int i = 0; i < enemiesAmount; i++) {
