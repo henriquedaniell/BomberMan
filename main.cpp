@@ -213,7 +213,7 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	            } //Fim switch
 	        }
 	    }
-	    cout<<"\n";
+	    cout << "\033[K\n";
 	} //Fim for mapa
 }
 
@@ -340,11 +340,13 @@ int main() {
 
     this_thread::sleep_for(chrono::seconds(2)); // Pausa de 2 segundos para então mostrar o menu
 
+    system("mode con: cols=70 lines=30");
 
 	// Inicialização da struct Character (player)
     Character player{.maxConcurrentBombs = 1};
 
     while(menu()){
+        cout << "\033[2J\033[H";
         player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0;
         score = 0;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
@@ -388,10 +390,9 @@ int main() {
             drawMap(mapGrid, player, bombs);
 
 
-            cout << endl;
-            cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A" << endl; // Tutorial
-            cout << "                   Colocar Bomba - F" << endl;
-            cout << "                   PONTOS: " << score << endl; // Pontuação
+            cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A\033[K" << endl;
+            cout << "                   Colocar Bomba - F\033[K" << endl;
+            cout << "                   PONTOS: " << score << "\033[K" << endl;
 
             ///Executa os movimentos
             if ( _kbhit() ){
