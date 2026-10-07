@@ -34,14 +34,20 @@ struct Bomb {
     int x, y, texture = 0;
     bool placed = false;
 
-    // Variavel para o timer da explosao
-    bool isExploding = false;
 
     // Inicialização variavel que armazena o timer da bomba
     chrono::steady_clock::time_point bombTimer = chrono::steady_clock::now();
 
-    // Inicialização variavel que armazena o timer da explosao
-    chrono::steady_clock::time_point explosionTimer = chrono::steady_clock::now();
+
+	struct Explosion {
+		int x, y, range = 1;
+		bool isExploding = false; // Variavel para o timer da explosao
+
+		// Inicialização variavel que armazena o timer da explosao
+		chrono::steady_clock::time_point explosionTimer = chrono::steady_clock::now();
+	};
+
+	Explosion explosion;
 };
 
 
@@ -67,6 +73,7 @@ struct Enemy {
     int x, y, direction=0;
     bool alive = true, deathAnimation = false;
     chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
+
 
 	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int newX = 0, int newY = 0) {
 		if (x + newX == player.x && y + newY == player.y) 	// Mata o player se o inimigo encostar nele
@@ -96,11 +103,55 @@ struct Enemy {
 
 // ========================================INICIO DAS FUNÇÕES===============================================
 
-// Função da área de explosão da bomba
+int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y) {
+	int posRange = abs(range);
+	int negRange = posRange * (-1);
 
-void bombCross(int &gridPos) {
-	if (gridPos == 0 || gridPos == 2 || gridPos == 5)
-		gridPos = 4;
+	switch (dir) {
+		case 0:
+			return gameMap[y + negRange][x]; break;
+		case 1:
+			return gameMap[y][x + posRange]; break;
+		case 2:
+			return gameMap[y + posRange][x]; break;
+		case 3:
+			return gameMap[y][x + negRange]; break;
+	}
+}
+
+
+// Função da área de explosão da bomba
+void bombCross(int (&gameMap)[13][19], int explosionRange, Bomb::Explosion origin, bool clearExplosion = false){
+	for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
+		bool hitWall = false;
+
+		for (int range = 1; range <= explosionRange; range++) {
+			int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y);
+			switch (gridPos) {
+				case 4:
+					if (clearExplosion)
+						gridPos = 0;
+					break;
+				case 1:
+					hitWall = true;
+					break;
+				case 2:
+					if (!clearExplosion)
+						gridPos = 4;
+					hitWall = true;
+					break;
+				case 0: case 5:
+					if (!clearExplosion)
+						gridPos = 4;
+					break;
+			}
+
+			if (hitWall)
+				break;
+		}
+	}
+
+
 }
 
 // Função para pintar o pavio da bomba
@@ -417,7 +468,7 @@ int main() {
                             mapGrid[player.y][player.x] = 3;
 
                             for (int k = 0; k < player.maxConcurrentBombs; k++) {
-                                if (!bombs[k].placed && !bombs[k].isExploding) {
+                                if (!bombs[k].placed) {
                                     bombs[k].x = player.x;
                                     bombs[k].y = player.y;
                                     bombs[k].placed = true;
@@ -483,44 +534,41 @@ int main() {
 
 
 
-             // timer da bomba depois de posicionada:
+             // timer da bomba depois de posicionada (ANTES DE EXPLODIR):
              for (int k = 0; k < player.maxConcurrentBombs; k++) {
                 if (bombs[k].placed) {
                     bombs[k].texture = globalTimer(bombs[k].bombTimer, 3, bombs[k].placed, true);
 
                     if (!bombs[k].placed) {
                         mapGrid[bombs[k].y][bombs[k].x] = 4;
-                        bombs[k].isExploding = true;
-                        bombCross(mapGrid[bombs[k].y - 1][bombs[k].x]);
-                        bombCross(mapGrid[bombs[k].y + 1][bombs[k].x]);
-                        bombCross(mapGrid[bombs[k].y][bombs[k].x - 1]);
-                        bombCross(mapGrid[bombs[k].y][bombs[k].x + 1]);
+                        bombs[k].explosion.isExploding = true;
+						bombs[k].explosion.x = bombs[k].x;
+						bombs[k].explosion.y = bombs[k].y;
+                        bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion);
 
                         for (int i = 0; i < enemiesAmount; i++) {
                             if (enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 4)
                                 enemies[i].death(mapGrid[enemies[i].y][enemies[i].x]);
                         }
 
-                        bombs[k].explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
+                        bombs[k].explosion.explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
                         cout << "\a"; // Som de EXPLOSAO (beep)
                     }
                 }
             }
 
+
+			// timer da explosão da bomba (DURANTE A EXPLOSÃO)
             for (int k = 0; k < player.maxConcurrentBombs; k++) {
-                if (bombs[k].isExploding) { //Duração da explosão
+                if (bombs[k].explosion.isExploding) { //Duração da explosão
                     if (mapGrid[player.y][player.x] == 4) // Mata o jogador se ele andar enquanto a explosão está ativa
                         player.alive = false;
 
-                    globalTimer(bombs[k].explosionTimer, 1, bombs[k].isExploding);
+                    globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
 
-                    if (!bombs[k].isExploding) { // acabou a explosão DESTA bomba
-                        int bx = bombs[k].x, by = bombs[k].y;
-                        if (mapGrid[by][bx]     == 4) mapGrid[by][bx]     = 0;
-                        if (mapGrid[by-1][bx]   == 4) mapGrid[by-1][bx]   = 0;
-                        if (mapGrid[by+1][bx]   == 4) mapGrid[by+1][bx]   = 0;
-                        if (mapGrid[by][bx-1]   == 4) mapGrid[by][bx-1]   = 0;
-                        if (mapGrid[by][bx+1]   == 4) mapGrid[by][bx+1]   = 0;
+                    if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
+                        bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion, true);
+                        mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
 
 						if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
                     }
