@@ -509,7 +509,7 @@ int main() {
                     case 77: case 'd': /// Direita
                         player.movement(mapGrid, 1);
                     break;
-                    case 'f':
+					case 32: case 'f':
                         // Se há espaço para colocar uma nova bomba, o F posiciona uma bomba na posição atual do jogador
                         if (player.totalBombsPlaced < player.maxConcurrentBombs && mapGrid[player.y][player.x] != 3) {
                             mapGrid[player.y][player.x] = 3;
