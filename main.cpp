@@ -77,6 +77,51 @@ struct Bomb {
 	};
 
 	Explosion explosion;
+
+
+	// Função da área de explosão da bomba
+	void bombCross(int (&gameMap)[13][19], bool clearExplosion = false){
+		for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
+			bool hitWall = false;
+			int explosionRange = explosion.range;
+			Explosion origin = explosion;
+
+			for (int range = 1; range <= explosionRange; range++) {
+				int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y);
+				switch (gridPos) {
+					case 4:
+						if (clearExplosion)
+							gridPos = 0;
+						break;
+					case 1:
+						hitWall = true;
+						break;
+					case 2:
+						if (!clearExplosion)
+							gridPos = 4;
+						hitWall = true;
+						break;
+					case 0: case 5:
+						if (!clearExplosion)
+							gridPos = 4;
+						break;
+				}
+
+				if (hitWall)
+					break;
+			}
+		}
+
+
+	}
+
+	void explode(int (&gameMap)[13][19]) {
+		gameMap[y][x] = 4;
+		explosion.isExploding = true;
+		explosion.x = x;
+		explosion.y = y;
+		bombCross(gameMap);
+	}
 };
 
 
@@ -157,41 +202,6 @@ struct Enemy {
 
 
 // ========================================INICIO DAS FUNÇÕES===============================================
-
-
-// Função da área de explosão da bomba
-void bombCross(int (&gameMap)[13][19], int explosionRange, Bomb::Explosion origin, bool clearExplosion = false){
-	for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
-		bool hitWall = false;
-
-		for (int range = 1; range <= explosionRange; range++) {
-			int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y);
-			switch (gridPos) {
-				case 4:
-					if (clearExplosion)
-						gridPos = 0;
-					break;
-				case 1:
-					hitWall = true;
-					break;
-				case 2:
-					if (!clearExplosion)
-						gridPos = 4;
-					hitWall = true;
-					break;
-				case 0: case 5:
-					if (!clearExplosion)
-						gridPos = 4;
-					break;
-			}
-
-			if (hitWall)
-				break;
-		}
-	}
-
-
-}
 
 // Função para pintar o pavio da bomba
 string bombColor(int secondsRemaining) {
@@ -701,11 +711,7 @@ int main() {
                     bombs[k].texture = globalTimer(bombs[k].bombTimer, 3, bombs[k].placed, true);
 
                     if (!bombs[k].placed) {
-                        mapGrid[bombs[k].y][bombs[k].x] = 4;
-                        bombs[k].explosion.isExploding = true;
-						bombs[k].explosion.x = bombs[k].x;
-						bombs[k].explosion.y = bombs[k].y;
-                        bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion);
+                        bombs[k].explode(mapGrid);
 
                         for (int i = 0; i < enemiesAmount; i++) {
                             if (enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 4)
@@ -729,7 +735,7 @@ int main() {
                     globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
 
                     if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
-                        bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion, true);
+                        bombs[k].bombCross(mapGrid, true);
                         mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
                     }
                 }
