@@ -21,12 +21,40 @@ uniform_int_distribution<> ranY(1, 11); // Sorteador da casa Y que o inimigo vai
 uniform_int_distribution<> distrib(1, 100); // Sorteador da parede quebrável
 
 
+
+
+/*
+PARA FAZER (EDUARDO):
+    - adicionar caixas e powerups
+    - limpar código criando funções
+    - tentar implementar recursividade
+*/
+
+
+
 // ========================================VARIAVEIS GLOBAIS=================================================
 
 int score = 0; // pontuação do jogo
 int difficulty = 1;
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 
+
+// =================FUNCAO DE DIRECOES================
+int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y) {
+	int posRange = abs(range);
+	int negRange = posRange * (-1);
+
+	switch (dir) {
+		case 0:
+			return gameMap[y + negRange][x]; break;
+		case 1:
+			return gameMap[y][x + posRange]; break;
+		case 2:
+			return gameMap[y + posRange][x]; break;
+		case 3:
+			return gameMap[y][x + negRange]; break;
+	}
+}
 
 // ========================================INICIO DAS STRUCTS===============================================
 
@@ -76,6 +104,32 @@ struct Enemy {
     chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
 
 
+    void spawn (Character player, int (&gameMap)[13][19]) {
+        bool inPosition = false;
+        while (!inPosition) {
+            int randomX = ranX(gen);
+            int randomY = ranY(gen);
+
+			if ((abs(randomX - player.x) + abs(randomY - player.y) <= 4) || gameMap[randomY][randomX] != 9)
+				continue;
+			else {
+				x = randomX;
+				y = randomY;
+				gameMap[y][x] = 5;
+
+				for (int dir = 0; dir < 4; dir++) {
+					int &gridPos = fourDirectionsValueReturner(dir, 1, gameMap, x, y);
+
+					if (gridPos == 9)
+						gridPos = 0;
+				}
+			}
+
+			inPosition = true;
+        }
+    }
+
+
 	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int newX = 0, int newY = 0) {
 		if (x + newX == player.x && y + newY == player.y) 	// Mata o player se o inimigo encostar nele
 		    player.alive = false;
@@ -103,22 +157,6 @@ struct Enemy {
 
 
 // ========================================INICIO DAS FUNÇÕES===============================================
-
-int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y) {
-	int posRange = abs(range);
-	int negRange = posRange * (-1);
-
-	switch (dir) {
-		case 0:
-			return gameMap[y + negRange][x]; break;
-		case 1:
-			return gameMap[y][x + posRange]; break;
-		case 2:
-			return gameMap[y + posRange][x]; break;
-		case 3:
-			return gameMap[y][x + negRange]; break;
-	}
-}
 
 
 // Função da área de explosão da bomba
@@ -166,32 +204,6 @@ string bombColor(int secondsRemaining) {
     return "\033[0m";
 }
 
-void enemiesSpawn (int enemiesAmount, Enemy &enemy, Character player, int (&mapGrid)[13][19] ){
-    bool enemyInPosition = false;
-    while (enemyInPosition == false){
-        int randomX = ranX(gen);
-        int randomY = ranY(gen);
-
-        if((abs(randomX - player.x) + abs(randomY - player.y) <=4) || mapGrid[randomY][randomX]!=9)
-            continue;
-        else {
-            enemy.x = randomX;
-            enemy.y = randomY;
-            mapGrid[randomY][randomX] = 5;
-
-            if(mapGrid[randomY+1][randomX] == 9)
-                mapGrid[randomY+1][randomX] = 0;
-            if(mapGrid[randomY-1][randomX] == 9)
-                mapGrid[randomY-1][randomX] = 0;
-            if(mapGrid[randomY][randomX+1] == 9)
-                mapGrid[randomY][randomX+1] = 0;
-            if(mapGrid[randomY][randomX-1] == 9)
-                mapGrid[randomY][randomX-1] = 0;
-        }
-        enemyInPosition = true;
-    }
-}
-
 ///Sorteio das paredes que serão destrutíveis
 void wallsGeneration(int (&gameMap)[13][19]) {
 	int randomWallGen = 0;
@@ -212,7 +224,7 @@ void wallsGeneration(int (&gameMap)[13][19]) {
 
 void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19]) {
 	for(int i=0; i<enemiesAmount; i++){
-	    enemiesSpawn(enemiesAmount, enemies[i], player, gameMap);
+	    enemies[i].spawn(player, gameMap);
 	}
 
 	wallsGeneration(gameMap);
@@ -419,7 +431,7 @@ int main() {
     system("mode con: cols=70 lines=30");
 
 	// Inicialização da struct Character (player)
-    Character player{.maxConcurrentBombs = 1};
+    Character player{.maxConcurrentBombs = 5};
 
     while(menu()){
         cout << "\033[2J\033[H";
@@ -432,15 +444,15 @@ int main() {
         int mapGrid[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                                 1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
                                 1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,2,9,2,9,9,9,2,9,9,2,9,9,9,9,9,9,9,1,
+                                1,2,9,9,2,9,9,9,2,9,2,9,9,9,9,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,2,9,9,9,2,9,9,2,9,9,2,9,9,9,9,2,9,1,
+                                1,9,2,9,9,2,9,9,2,9,9,2,9,9,9,9,2,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,2,1,9,1,9,1,
-                                1,9,9,9,9,2,9,9,9,9,9,9,9,9,9,9,9,9,1,
+                                1,9,9,9,9,9,2,9,9,9,9,9,9,9,9,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,2,1,9,1,9,1,
                                 1,9,9,2,9,9,9,9,9,2,9,9,9,9,2,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,9,9,2,9,9,9,9,9,9,2,9,9,9,9,9,9,9,1,
+                                1,9,9,9,2,9,9,9,9,9,2,9,9,9,9,9,9,9,1,
                                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
         // Inicialização da variável que armazena o timer do movimento dos inimigos.
