@@ -25,10 +25,39 @@ uniform_int_distribution<> ranPortalX(9, 17); // Sorteador da casa X que o porta
 uniform_int_distribution<> ranPortalY(6, 11); // Sorteador da casa Y que o portal vai spawnar
 
 
+
+
+/*
+PARA FAZER (EDUARDO):
+    - adicionar caixas e powerups
+    - limpar código criando funções
+    - tentar implementar recursividade
+*/
+
+
+
 // ========================================VARIAVEIS GLOBAIS=================================================
 
 int score = 0; // pontuação do jogo
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
+
+
+// =================FUNCAO DE DIRECOES================
+int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y) {
+	int posRange = abs(range);
+	int negRange = posRange * (-1);
+
+	switch (dir) {
+		case 0:
+			return gameMap[y + negRange][x]; break;
+		case 1:
+			return gameMap[y][x + posRange]; break;
+		case 2:
+			return gameMap[y + posRange][x]; break;
+		case 3:
+			return gameMap[y][x + negRange]; break;
+	}
+}
 
 // ========================================INICIO DAS STRUCTS===============================================
 
@@ -51,6 +80,51 @@ struct Bomb {
 	};
 
 	Explosion explosion;
+
+
+	// Função da área de explosão da bomba
+	void bombCross(int (&gameMap)[13][19], bool clearExplosion = false){
+		for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
+			bool hitWall = false;
+			int explosionRange = explosion.range;
+			Explosion origin = explosion;
+
+			for (int range = 1; range <= explosionRange; range++) {
+				int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y);
+				switch (gridPos) {
+					case 4:
+						if (clearExplosion)
+							gridPos = 0;
+						break;
+					case 1:
+						hitWall = true;
+						break;
+					case 2:
+						if (!clearExplosion)
+							gridPos = 4;
+						hitWall = true;
+						break;
+					case 0: case 5:
+						if (!clearExplosion)
+							gridPos = 4;
+						break;
+				}
+
+				if (hitWall)
+					break;
+			}
+		}
+
+
+	}
+
+	void explode(int (&gameMap)[13][19]) {
+		gameMap[y][x] = 4;
+		explosion.isExploding = true;
+		explosion.x = x;
+		explosion.y = y;
+		bombCross(gameMap);
+	}
 };
 
 
@@ -76,6 +150,32 @@ struct Enemy {
     int x, y, direction=0;
     bool alive = true, deathAnimation = false;
     chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
+
+
+    void spawn (Character player, int (&gameMap)[13][19]) {
+        bool inPosition = false;
+        while (!inPosition) {
+            int randomX = ranX(gen);
+            int randomY = ranY(gen);
+
+			if ((abs(randomX - player.x) + abs(randomY - player.y) <= 4) || gameMap[randomY][randomX] != 9)
+				continue;
+			else {
+				x = randomX;
+				y = randomY;
+				gameMap[y][x] = 5;
+
+				for (int dir = 0; dir < 4; dir++) {
+					int &gridPos = fourDirectionsValueReturner(dir, 1, gameMap, x, y);
+
+					if (gridPos == 9)
+						gridPos = 0;
+				}
+			}
+
+			inPosition = true;
+        }
+    }
 
 
 	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int newX = 0, int newY = 0) {
@@ -107,57 +207,6 @@ struct Enemy {
 
 // ========================================INICIO DAS FUNÇÕES===============================================
 
-int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y) {
-	int posRange = abs(range);
-	int negRange = posRange * (-1);
-
-	switch (dir) {
-		case 0:
-			return gameMap[y + negRange][x]; break;
-		case 1:
-			return gameMap[y][x + posRange]; break;
-		case 2:
-			return gameMap[y + posRange][x]; break;
-		case 3:
-			return gameMap[y][x + negRange]; break;
-	}
-}
-
-
-// Função da área de explosão da bomba
-void bombCross(int (&gameMap)[13][19], int explosionRange, Bomb::Explosion origin, bool clearExplosion = false){
-	for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
-		bool hitWall = false;
-
-		for (int range = 1; range <= explosionRange; range++) {
-			int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y);
-			switch (gridPos) {
-				case 4:
-					if (clearExplosion)
-						gridPos = 0;
-					break;
-				case 1:
-					hitWall = true;
-					break;
-				case 2:
-					if (!clearExplosion)
-						gridPos = 4;
-					hitWall = true;
-					break;
-				case 0: case 5:
-					if (!clearExplosion)
-						gridPos = 4;
-					break;
-			}
-
-			if (hitWall)
-				break;
-		}
-	}
-
-
-}
-
 // Função para pintar o pavio da bomba
 string bombColor(int secondsRemaining) {
     switch(secondsRemaining) {
@@ -167,32 +216,6 @@ string bombColor(int secondsRemaining) {
     }
 
     return "\033[0m";
-}
-
-void enemiesSpawn (int enemiesAmount, Enemy &enemy, Character player, int (&mapGrid)[13][19] ){
-    bool enemyInPosition = false;
-    while (enemyInPosition == false){
-        int randomX = ranX(gen);
-        int randomY = ranY(gen);
-
-        if((abs(randomX - player.x) + abs(randomY - player.y) <=4) || mapGrid[randomY][randomX]!=9)
-            continue;
-        else {
-            enemy.x = randomX;
-            enemy.y = randomY;
-            mapGrid[randomY][randomX] = 5;
-
-            if(mapGrid[randomY+1][randomX] == 9)
-                mapGrid[randomY+1][randomX] = 0;
-            if(mapGrid[randomY-1][randomX] == 9)
-                mapGrid[randomY-1][randomX] = 0;
-            if(mapGrid[randomY][randomX+1] == 9)
-                mapGrid[randomY][randomX+1] = 0;
-            if(mapGrid[randomY][randomX-1] == 9)
-                mapGrid[randomY][randomX-1] = 0;
-        }
-        enemyInPosition = true;
-    }
 }
 
 ///Sorteio das paredes que serão destrutíveis
@@ -224,7 +247,7 @@ void portalGeneration(int (&gameMap)[13][19]) {
 
 void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19]) {
 	for(int i=0; i<enemiesAmount; i++){
-	    enemiesSpawn(enemiesAmount, enemies[i], player, gameMap);
+	    enemies[i].spawn(player, gameMap);
 	}
 
 	wallsGeneration(gameMap);
@@ -375,7 +398,7 @@ int main() {
     system("mode con: cols=70 lines=30");
 
 	// Inicialização da struct Character (player)
-    Character player{.maxConcurrentBombs = 1};
+    Character player{.maxConcurrentBombs = 5};
 
     while(menu(alreadyPlayed)){
         cout << "\033[2J\033[H";
@@ -388,15 +411,15 @@ int main() {
         int mapGrid[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                                 1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
                                 1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,2,9,2,9,9,9,2,9,9,2,9,9,9,9,9,9,9,1,
+                                1,2,9,9,2,9,9,9,2,9,2,9,9,9,9,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,2,9,9,9,2,9,9,2,9,9,2,9,9,9,9,2,9,1,
+                                1,9,2,9,9,2,9,9,2,9,9,2,9,9,9,9,2,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,2,1,9,1,9,1,
-                                1,9,9,9,9,2,9,9,9,9,9,9,9,9,9,9,9,9,1,
+                                1,9,9,9,9,9,2,9,9,9,9,9,9,9,9,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,2,1,9,1,9,1,
                                 1,9,9,2,9,9,9,9,9,2,9,9,9,9,2,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,9,9,2,9,9,9,9,9,9,2,9,9,9,9,9,9,9,1,
+                                1,9,9,9,2,9,9,9,9,9,2,9,9,9,9,9,9,9,1,
                                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
         // Inicialização da variável que armazena o timer do movimento dos inimigos.
@@ -448,7 +471,7 @@ int main() {
                         player.movement(mapGrid, 1);
                         player.totalMovement +=1;
                     break;
-                    case 'f':
+					          case 13: case 32: case 'f':
                         // Se há espaço para colocar uma nova bomba, o F posiciona uma bomba na posição atual do jogador
                         if (player.totalBombsPlaced < player.maxConcurrentBombs && mapGrid[player.y][player.x] != 3) {
                             mapGrid[player.y][player.x] = 3;
@@ -563,11 +586,7 @@ int main() {
                     bombs[k].texture = globalTimer(bombs[k].bombTimer, 3, bombs[k].placed, true);
 
                     if (!bombs[k].placed) {
-                        mapGrid[bombs[k].y][bombs[k].x] = 4;
-                        bombs[k].explosion.isExploding = true;
-						bombs[k].explosion.x = bombs[k].x;
-						bombs[k].explosion.y = bombs[k].y;
-                        bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion);
+                        bombs[k].explode(mapGrid);
 
                         for (int i = 0; i < enemiesAmount; i++) {
                             if (enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 4)
@@ -591,7 +610,7 @@ int main() {
                     globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
 
                     if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
-                        bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion, true);
+                        bombs[k].bombCross(mapGrid, true);
                         mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
                     }
                 }
