@@ -715,7 +715,7 @@ int main() {
 
                     globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
 
-                    if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
+                    if (!bombs[k].explosion.explosion.isExploding) { // acabou a explosão DESTA bomba
                         bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion, true);
                         mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
 
