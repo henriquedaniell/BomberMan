@@ -488,12 +488,12 @@ int main() {
                         player.movement(mapGrid, 1);
                     break;
                     case 'f':
-                        // Se não há bomba colocada, o F posiciona uma bomba na posição atual do jogador
+                        // Se há espaço para colocar uma nova bomba, o F posiciona uma bomba na posição atual do jogador
                         if (player.totalBombsPlaced < player.maxConcurrentBombs && mapGrid[player.y][player.x] != 3) {
                             mapGrid[player.y][player.x] = 3;
 
                             for (int k = 0; k < player.maxConcurrentBombs; k++) {
-                                if (!bombs[k].placed && !bombs[k].isExploding) {
+                                if (!bombs[k].placed) {
                                     bombs[k].x = player.x;
                                     bombs[k].y = player.y;
                                     bombs[k].placed = true;
@@ -691,8 +691,8 @@ int main() {
                     if (!bombs[k].placed) {
                         mapGrid[bombs[k].y][bombs[k].x] = 4;
                         bombs[k].explosion.isExploding = true;
-						            bombs[k].explosion.x = bombs[k].x;
-						            bombs[k].explosion.y = bombs[k].y;
+						bombs[k].explosion.x = bombs[k].x;
+						bombs[k].explosion.y = bombs[k].y;
                         bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion);
 
                         for (int i = 0; i < enemiesAmount; i++) {
@@ -702,6 +702,7 @@ int main() {
 
                         bombs[k].explosion.explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
                         cout << "\a"; // Som de EXPLOSAO (beep)
+						if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
                     }
                 }
             }
@@ -715,11 +716,9 @@ int main() {
 
                     globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
 
-                    if (!bombs[k].explosion.explosion.isExploding) { // acabou a explosão DESTA bomba
+                    if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
                         bombCross(mapGrid, bombs[k].explosion.range, bombs[k].explosion, true);
                         mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
-
-						if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
                     }
                 }
             }
