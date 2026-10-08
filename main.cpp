@@ -28,7 +28,7 @@ uniform_int_distribution<> ranPortalY(6, 11); // Sorteador da casa Y que o porta
 int score = 0; // pontuação do jogo
 int difficulty = 1;
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
-
+String difficultyString = "Fácil";
 
 // ========================================INICIO DAS STRUCTS===============================================
 
@@ -273,7 +273,7 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	                case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break; // Explosão
 	                case 5: cout << "👾 "; break; // Inimigo
 	                case 6: cout << "💀 "; break; // Morte do inimigo
-	                case 8: cout << "🕳️ "; break; // Portal para próxima fase
+	                case 8: cout << "🌀 "; break; // Portal para próxima fase
 	                //default: cout<<"-"; //erro
 	            } //Fim switch
 	        }
@@ -373,20 +373,32 @@ void chooseDifficulty(int &difficulty){
     cout <<     "||                       ||" << endl;
     cout <<     "||       1- Fácil        ||" << endl;
     cout <<     "||                       ||" << endl;
-    cout <<     "||       2- Médio        ||" << endl;
+    cout <<     "||       2- Média        ||" << endl;
     cout <<     "||                       ||" << endl;
     cout <<     "||      3- Difícil       ||" << endl;
     cout <<     "||                       ||" << endl;
     cout <<     " ================================ " << endl;
     cout <<     "  Escolha a dificuldade: ";
     cin >> difficulty;
-
+	
     if (cin.fail()) {          // se usuário digitou letra, ignora e tenta dnv
             cin.clear();
             cin.ignore(10000, '\n');
             chooseDifficulty(difficulty);
     } else if(difficulty<1 || difficulty > 3)
         chooseDifficulty(difficulty);
+
+	switch(difficulty){
+		case 1:
+			difficultyString = "Fácil";
+			break;
+		case 2:
+			difficultyString = "Média";
+			break;
+		case 3:
+			difficultyString = "Difícil";
+			break;
+	}
 }
 
 bool menu(){
@@ -403,9 +415,11 @@ bool menu(){
         } else {
             cout << "||   1- Jogar Novamente    ||" << endl;
         }
-        cout <<     "|| 2- Escolher Dificuldade ||" << endl;
-        cout <<     "||       3- Créditos       ||" << endl;
-        cout <<     "||        4- Sair          ||" << endl;
+        cout <<     "||  +2- Dificuldade ("<<difficultyString<<")"<<
+											 <<"||" << endl;
+        cout <<     "||      3- Instruções      ||" << endl;
+		cout <<     "||       4- Créditos       ||" << endl;
+		cout <<     "||        5- Sair          ||" << endl;
         cout <<     "||                         ||" << endl;
         cout <<     " =========================== " << endl;
         cout <<     "     ESCOLHA UMA OPCAO: ";
