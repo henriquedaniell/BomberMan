@@ -312,14 +312,14 @@ void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&ma
             case 0: // Para cima
                 enemies.movement(mapGrid, player, hasMoved, 0, -1);
                 break;
-            case 1: // Para baixo
+            case 1: // Para direita
+                enemies.movement(mapGrid, player, hasMoved, 1);
+                break;
+            case 2: // Para baixo
                 enemies.movement(mapGrid, player, hasMoved, 0, 1);
                 break;
-            case 2: // Para esquerda
+            case 3: // Para esquerda
                 enemies.movement(mapGrid, player, hasMoved, -1);
-                break;
-            case 3: // Para direita
-                enemies.movement(mapGrid, player, hasMoved, 1);
                 break;
         }
         attempts++; // Aumenta o contador de tentativas
@@ -552,16 +552,16 @@ int main() {
                                             enemies[i].movement(mapGrid, player, hasMoved, 0, -1);
                                             break;
 
-                                        case 1: // Baixo
+                                        case 1: // Direita
+                                            enemies[i].movement(mapGrid, player, hasMoved, 1);
+                                            break;
+
+                                        case 2: // Baixo
                                             enemies[i].movement(mapGrid, player, hasMoved, 0, 1);
                                             break;
 
-                                        case 2: // Esquerda
-                                            enemies[i].movement(mapGrid, player, hasMoved, -1, 0);
-                                            break;
-
-                                        case 3: // Direita
-                                            enemies[i].movement(mapGrid, player, hasMoved, 1, 0);
+                                        case 3: // Esquerda
+                                            enemies[i].movement(mapGrid, player, hasMoved, -1);
                                             break;
                                     }
                                 }
