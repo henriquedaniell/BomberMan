@@ -471,7 +471,7 @@ int main() {
                         player.movement(mapGrid, 1);
                         player.totalMovement +=1;
                     break;
-					          case 13: case 32: case 'f':
+                    case 13: case 32: case 'f':
                         // Se há espaço para colocar uma nova bomba, o F posiciona uma bomba na posição atual do jogador
                         if (player.totalBombsPlaced < player.maxConcurrentBombs && mapGrid[player.y][player.x] != 3) {
                             mapGrid[player.y][player.x] = 3;
@@ -636,8 +636,15 @@ int main() {
         else if(score >= enemiesAmount * 250)
             cout << "       Parabéns! Você matou todos os INIMIGOS! 🏅" << endl;
 
-        cout << "       Aperte uma tecla para voltar ao Menu.";
-        getch();
+        cout << "       Aperte ENTER para voltar ao Menu.";
+
+        while(true) {
+            char enter = _getch();
+
+            if (enter == 13) {
+                break;
+            }
+        }
     }
 
 
