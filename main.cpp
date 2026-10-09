@@ -61,6 +61,22 @@ int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x,
 
 // ========================================INICIO DAS STRUCTS===============================================
 
+// STRUCT DE PERSONAGEM JOGADOR
+struct Character {
+    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
+    bool alive = true;
+
+    void movement(int gameMap[13][19], int newX = 0, int newY = 0) {
+        if (gameMap[y + newY][x + newX] == 0) {
+            x += newX;           // Move o player caso haja caminho livre
+            y += newY;
+        }
+        else if(gameMap[y + newY][x + newX] == 5 || gameMap[y + newY][x + newX] == 4) {
+            alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
+        }
+    }
+};
+
 // STRUCT DE BOMBAS
 struct Bomb {
     int x, y, texture = 0;
@@ -83,7 +99,7 @@ struct Bomb {
 
 
 	// Função da área de explosão da bomba
-	void bombCross(int (&gameMap)[13][19], bool clearExplosion = false){
+	void bombCross(int (&gameMap)[13][19], Character &player, bool clearExplosion = false){
 		for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
 			bool hitWall = false;
 			int explosionRange = explosion.range;
@@ -100,8 +116,10 @@ struct Bomb {
 						hitWall = true;
 						break;
 					case 2:
-						if (!clearExplosion)
+						if (!clearExplosion) {
 							gridPos = 4;
+                            player.totalWallsBroken++;
+						}
 						hitWall = true;
 						break;
 					case 0: case 5:
@@ -118,32 +136,14 @@ struct Bomb {
 
 	}
 
-	void explode(int (&gameMap)[13][19]) {
+	void explode(int (&gameMap)[13][19], Character &player) {
 		gameMap[y][x] = 4;
 		explosion.isExploding = true;
 		explosion.x = x;
 		explosion.y = y;
-		bombCross(gameMap);
+		bombCross(gameMap, player);
 	}
 };
-
-
-// STRUCT DE PERSONAGEM JOGADOR
-struct Character {
-    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, enemiesKilled = 0, totalMovement = 0;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
-    bool alive = true;
-
-    void movement(int gameMap[13][19], int newX = 0, int newY = 0) {
-        if (gameMap[y + newY][x + newX] == 0) {
-            x += newX;           // Move o player caso haja caminho livre
-            y += newY;
-        }
-        else if(gameMap[y + newY][x + newX] == 5 || gameMap[y + newY][x + newX] == 4) {
-            alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
-        }
-    }
-};
-
 
 // STRUCT DOS INIMIGOS
 struct Enemy {
@@ -586,7 +586,7 @@ int main() {
                     bombs[k].texture = globalTimer(bombs[k].bombTimer, 3, bombs[k].placed, true);
 
                     if (!bombs[k].placed) {
-                        bombs[k].explode(mapGrid);
+                        bombs[k].explode(mapGrid, player);
 
                         for (int i = 0; i < enemiesAmount; i++) {
                             if (enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 4)
@@ -610,7 +610,7 @@ int main() {
                     globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
 
                     if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
-                        bombs[k].bombCross(mapGrid, true);
+                        bombs[k].bombCross(mapGrid, player, true);
                         mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
                     }
                 }
@@ -637,7 +637,7 @@ int main() {
             cout << "       Parabéns! Você matou todos os INIMIGOS! 🏅" << endl;
 
         cout << "       Aperte ENTER para voltar ao Menu.";
-
+        
         while(true) {
             char enter = _getch();
 
