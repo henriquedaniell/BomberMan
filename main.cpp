@@ -69,6 +69,18 @@ int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x,
 			return gameMap[y][x + negRange];
 		break;
 	}
+
+	return gameMap[0][0];
+}
+
+// =====FUNCAO DE REDUZIR CONTAGENS POSITIVAS======
+void reducePositiveCount(int &count, int &gridPos, bool resetGridValue = false) {
+	if (count <= 1) {
+		count = 0;
+		if (resetGridValue)
+			gridPos = 0;
+	} else
+		count--;
 }
 
 // ========================================INICIO DAS STRUCTS===============================================
@@ -203,6 +215,7 @@ struct Bomb {
                                 if (bombs[k].x == newX && bombs[k].y == newY && bombs[k].placed) {
                                     bombs[k].placed = false;
                                     bombs[k].explode(gameMap, player, bombs, enemies, enemiesAmount);
+									GAME.explosionCountingGrid[newY][newX]++;
                                     break;
                                 }
                             }
@@ -211,12 +224,7 @@ struct Bomb {
                         break;
 					case 4:
 						if (clearExplosion) {
-							if (GAME.explosionCountingGrid[newY][newX] <= 1) {
-                                GAME.explosionCountingGrid[newY][newX] = 0;
-                                gridPos = 0;
-							} else {
-                                GAME.explosionCountingGrid[newY][newX]--;
-							}
+							reducePositiveCount(GAME.explosionCountingGrid[newY][newX], gridPos, true);
 						} else {
                             GAME.explosionCountingGrid[newY][newX]++;
 						}
@@ -229,10 +237,7 @@ struct Bomb {
 						break;
                     case 6: case 8:
                         if (clearExplosion) {
-                            if (GAME.explosionCountingGrid[newY][newX] <= 1)
-                                GAME.explosionCountingGrid[newY][newX] = 0;
-                            else
-                                GAME.explosionCountingGrid[newY][newX]--;
+							reducePositiveCount(GAME.explosionCountingGrid[newY][newX], gridPos);
                         } else {
                             GAME.explosionCountingGrid[newY][newX]++;
                         }
@@ -262,7 +267,6 @@ struct Bomb {
 
 		explosion.explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
 		if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
-		cout << "\a"; // Som de EXPLOSAO (beep)
 	}
 };
 // ========================================FIM DAS STRUCTS===============================================
@@ -391,7 +395,7 @@ void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&ma
 }
 
 void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character player){
-    while(!hasMoved && attempts < 10){
+    while(!hasMoved && attempts < 10 && enemies.alive && player.alive){
         if(player.x - enemies.x > 0){
             enemies.movement(mapGrid, player, hasMoved, 1);
         } else if(player.x - enemies.x < 0){
@@ -451,7 +455,7 @@ void configurarConsole(COORD &coord) {
 
 
 int main() {
-	
+
 	COORD coord;
     configurarConsole(coord);
 
@@ -468,7 +472,7 @@ int main() {
     system("mode con: cols=70 lines=30");
 
 	// Inicialização da struct Character (player)
-    Character player{.maxConcurrentBombs = 5};
+    Character player{.maxConcurrentBombs = 1};
 
     while(menu(alreadyPlayed)){
         cout << "\033[2J\033[H";
@@ -665,6 +669,7 @@ int main() {
 
                     if (!bombs[k].placed) {
                         bombs[k].explode(mapGrid, player, bombs, enemies, enemiesAmount);
+						cout << "\a"; // Som de EXPLOSAO (beep)
                     }
                 }
             }
@@ -680,12 +685,7 @@ int main() {
 
                     if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
                         bombs[k].bombCross(mapGrid, player, bombs, enemies, enemiesAmount, true);
-                        if (GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x] <= 1) {
-                            GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
-                            mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
-                        } else {
-                            GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x]--;
-                        }
+						reducePositiveCount(GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x], mapGrid[bombs[k].explosion.y][bombs[k].explosion.x], true);
                     }
                 }
             }
