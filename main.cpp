@@ -414,15 +414,9 @@ void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int
 }
 
 
-// ========================================FIM DAS FUNÇÕES=================================================
-
-
-// ===============================================INICIO DO MAIN=================================================
-
-
-int main() {
-
-    ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
+// Função de configurar o console pro jogo no início do código
+void configurarConsole(COORD &coord) {
+	///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
         //INICIO: COMANDOS PARA QUE O CURSOR NAO FIQUE PISCANDO NA TELA
         HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
         CONSOLE_CURSOR_INFO     cursorInfo;
@@ -432,7 +426,6 @@ int main() {
         //FIM: COMANDOS PARA QUE O CURSOR NAO FIQUE PISCANDO NA TELA
         //INICIO: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
         short int CX=0, CY=0;
-        COORD coord;
         coord.X = CX;
         coord.Y = CY;
         //FIM: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
@@ -448,6 +441,19 @@ int main() {
         GetConsoleMode(hOut, &dwMode);
         SetConsoleMode(hOut, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
     ///FIM DO TRECHO
+}
+
+
+// ========================================FIM DAS FUNÇÕES=================================================
+
+
+// ===============================================INICIO DO MAIN=================================================
+
+
+int main() {
+	
+	COORD coord;
+    configurarConsole(coord);
 
     cout << "\033[2J\033[H" << endl;
     cout << endl;
