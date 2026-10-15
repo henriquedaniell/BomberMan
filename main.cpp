@@ -506,6 +506,7 @@ int main() {
                                     }
                                 }
 
+                                player.totalBombsPlaced++;
                                 player.bombsPlaced++;
                             }
                         break;
