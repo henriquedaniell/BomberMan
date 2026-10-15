@@ -25,6 +25,17 @@ uniform_int_distribution<> ranPortalX(9, 17); // Sorteador da casa X que o porta
 uniform_int_distribution<> ranPortalY(6, 11); // Sorteador da casa Y que o portal vai spawnar
 
 
+
+
+/*
+PARA FAZER (EDUARDO):
+    - adicionar caixas e powerups
+    - limpar código criando funções
+    - tentar implementar recursividade
+*/
+
+
+
 // ========================================VARIAVEIS GLOBAIS=================================================
 
 int score = 0; // Pontuação do jogo
@@ -33,33 +44,58 @@ bool enteredPortal = false; // Confirma se entrou no portal
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 
 
+// =================FUNCAO DE DIRECOES================
+int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y, bool explosion = false, int* newX = nullptr, int* newY = nullptr) {
+	int posRange = abs(range);
+	int negRange = posRange * (-1);
+
+	switch (dir) {
+		case 0:
+			if (explosion)
+				*newY = y + negRange;
+			return gameMap[y + negRange][x];
+		break;
+		case 1:
+			if (explosion)
+				*newX = x + posRange;
+			return gameMap[y][x + posRange];
+		break;
+		case 2:
+			if (explosion)
+				*newY = y + posRange;
+			return gameMap[y + posRange][x];
+		break;
+		case 3:
+			if (explosion)
+				*newX = x + negRange;
+			return gameMap[y][x + negRange];
+		break;
+	}
+
+	return gameMap[0][0];
+}
+
+// =====FUNCAO DE REDUZIR CONTAGENS POSITIVAS======
+void reducePositiveCount(int &count, int &gridPos, bool resetGridValue = false) {
+	if (count <= 1) {
+		count = 0;
+		if (resetGridValue)
+			gridPos = 0;
+	} else
+		count--;
+}
+
 // ========================================INICIO DAS STRUCTS===============================================
 
-// STRUCT DE BOMBAS
-struct Bomb {
-    int x, y, texture = 0;
-    bool placed = false;
-
-
-    // Inicialização variavel que armazena o timer da bomba
-    chrono::steady_clock::time_point bombTimer = chrono::steady_clock::now();
-
-
-	struct Explosion {
-		int x, y, range = 1;
-		bool isExploding = false; // Variavel para o timer da explosao
-
-		// Inicialização variavel que armazena o timer da explosao
-		chrono::steady_clock::time_point explosionTimer = chrono::steady_clock::now();
-	};
-
-	Explosion explosion;
+// STRUCT JOGO
+struct GeneralGame {
+	int explosionCountingGrid[13][19] = {0};
 };
-
+GeneralGame GAME;
 
 // STRUCT DE PERSONAGEM JOGADOR
 struct Character {
-    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
+    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
 
     bool alive = true;
 
@@ -77,12 +113,37 @@ struct Character {
     }
 };
 
-
 // STRUCT DOS INIMIGOS
 struct Enemy {
     int x, y, direction=0;
     bool alive = true, deathAnimation = false;
     chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
+
+
+    void spawn (Character player, int (&gameMap)[13][19]) {
+        bool inPosition = false;
+        while (!inPosition) {
+            int randomX = ranX(gen);
+            int randomY = ranY(gen);
+
+			if ((abs(randomX - player.x) + abs(randomY - player.y) <= 4) || gameMap[randomY][randomX] != 9)
+				continue;
+			else {
+				x = randomX;
+				y = randomY;
+				gameMap[y][x] = 5;
+
+				for (int dir = 0; dir < 4; dir++) {
+					int &gridPos = fourDirectionsValueReturner(dir, 1, gameMap, x, y);
+
+					if (gridPos == 9)
+						gridPos = 0;
+				}
+			}
+
+			inPosition = true;
+        }
+    }
 
 
 	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int newX = 0, int newY = 0) {
@@ -105,7 +166,114 @@ struct Enemy {
 		deathTimer = chrono::steady_clock::now();
 		score += 250;
 		gridPos = 6;
+		if (GAME.explosionCountingGrid[y][x] > 0)
+            GAME.explosionCountingGrid[y][x]--;
 		player.enemiesKilled += 1;
+	}
+};
+
+// STRUCT DE BOMBAS
+struct Bomb {
+    int x, y, texture = 0;
+    bool placed = false;
+
+
+    // Inicialização variavel que armazena o timer da bomba
+    chrono::steady_clock::time_point bombTimer = chrono::steady_clock::now();
+
+
+	struct Explosion {
+		int x, y, range = 1;
+		bool isExploding = false; // Variavel para o timer da explosao
+
+		// Inicialização variavel que armazena o timer da explosao
+		chrono::steady_clock::time_point explosionTimer = chrono::steady_clock::now();
+	};
+
+	Explosion explosion;
+
+
+	// Função da área de explosão da bomba
+	void bombCross(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], int enemiesAmount, bool clearExplosion = false){
+		for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
+			bool hitWall = false;
+			int explosionRange = explosion.range;
+			Explosion origin = explosion;
+
+			for (int range = 1; range <= explosionRange; range++) {
+                int newX = origin.x, newY = origin.y;
+				int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y, true, &newX, &newY);
+				switch (gridPos) {
+				    case 1:
+						hitWall = true;
+						break;
+					case 2:
+						if (!clearExplosion) {
+                            GAME.explosionCountingGrid[newY][newX] = 1;
+							gridPos = 4;
+                            player.totalWallsBroken++;
+						}
+						hitWall = true;
+                        score += 10;
+						break;
+                    case 3:
+                        if (!clearExplosion) {
+                            for (int k = 0; k < player.maxConcurrentBombs; k++) {
+                                if (bombs[k].x == newX && bombs[k].y == newY && bombs[k].placed) {
+                                    bombs[k].placed = false;
+                                    bombs[k].explode(gameMap, score, player, bombs, enemies, enemiesAmount);
+									GAME.explosionCountingGrid[newY][newX]++;
+                                    break;
+                                }
+                            }
+                            hitWall = true;
+                        }
+                        break;
+					case 4:
+						if (clearExplosion) {
+							reducePositiveCount(GAME.explosionCountingGrid[newY][newX], gridPos, true);
+						} else {
+                            GAME.explosionCountingGrid[newY][newX]++;
+						}
+						break;
+					case 0: case 5:
+						if (!clearExplosion) {
+                            GAME.explosionCountingGrid[newY][newX] = 1;
+							gridPos = 4;
+						}
+						break;
+                    case 6: case 8:
+                        if (clearExplosion) {
+							reducePositiveCount(GAME.explosionCountingGrid[newY][newX], gridPos);
+                        } else {
+                            GAME.explosionCountingGrid[newY][newX]++;
+                        }
+                        break;
+				}
+
+				if (hitWall)
+					break;
+			}
+		}
+
+
+	}
+
+	void explode(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], int enemiesAmount) {
+		gameMap[y][x] = 4;
+		GAME.explosionCountingGrid[y][x]++;
+		explosion.isExploding = true;
+		explosion.x = x;
+		explosion.y = y;
+		bombCross(gameMap, score, player, bombs, enemies, enemiesAmount);
+
+		for (int i = 0; i < enemiesAmount; i++) {
+		    if (enemies[i].alive && gameMap[enemies[i].y][enemies[i].x] == 4)
+		        enemies[i].death(gameMap[enemies[i].y][enemies[i].x], player);
+		}
+
+		explosion.explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
+		if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
 	}
 };
 // ========================================FIM DAS STRUCTS===============================================
@@ -113,58 +281,6 @@ struct Enemy {
 
 
 // ========================================INICIO DAS FUNÇÕES===============================================
-
-int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y) {
-	int posRange = abs(range);
-	int negRange = posRange * (-1);
-
-	switch (dir) {
-		case 0:
-			return gameMap[y + negRange][x]; break;
-		case 1:
-			return gameMap[y][x + posRange]; break;
-		case 2:
-			return gameMap[y + posRange][x]; break;
-		case 3:
-			return gameMap[y][x + negRange]; break;
-	}
-}
-
-
-// Função da área de explosão da bomba
-void bombCross(int (&gameMap)[13][19], int &score, int explosionRange, Bomb::Explosion origin, bool clearExplosion = false){
-	for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
-		bool hitWall = false;
-
-		for (int range = 1; range <= explosionRange; range++) {
-			int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y);
-			switch (gridPos) {
-				case 4:
-					if (clearExplosion)
-						gridPos = 0;
-					break;
-				case 1:
-					hitWall = true;
-					break;
-				case 2:
-					if (!clearExplosion)
-						gridPos = 4;
-					hitWall = true;
-					score+=10;
-					break;
-				case 0: case 5:
-					if (!clearExplosion)
-						gridPos = 4;
-					break;
-			}
-
-			if (hitWall)
-				break;
-		}
-	}
-
-
-}
 
 // Função para pintar o pavio da bomba
 string bombColor(int secondsRemaining) {
@@ -175,32 +291,6 @@ string bombColor(int secondsRemaining) {
     }
 
     return "\033[0m";
-}
-
-void enemiesSpawn (int enemiesAmount, Enemy &enemy, Character player, int (&mapGrid)[13][19] ){
-    bool enemyInPosition = false;
-    while (enemyInPosition == false){
-        int randomX = ranX(gen);
-        int randomY = ranY(gen);
-
-        if((abs(randomX - player.x) + abs(randomY - player.y) <=4) || mapGrid[randomY][randomX]!=9)
-            continue;
-        else {
-            enemy.x = randomX;
-            enemy.y = randomY;
-            mapGrid[randomY][randomX] = 5;
-
-            if(mapGrid[randomY+1][randomX] == 9)
-                mapGrid[randomY+1][randomX] = 0;
-            if(mapGrid[randomY-1][randomX] == 9)
-                mapGrid[randomY-1][randomX] = 0;
-            if(mapGrid[randomY][randomX+1] == 9)
-                mapGrid[randomY][randomX+1] = 0;
-            if(mapGrid[randomY][randomX-1] == 9)
-                mapGrid[randomY][randomX-1] = 0;
-        }
-        enemyInPosition = true;
-    }
 }
 
 ///Sorteio das paredes que serão destrutíveis
@@ -232,7 +322,7 @@ void portalGeneration(int (&gameMap)[13][19]) {
 
 void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19]) {
 	for(int i=0; i<enemiesAmount; i++){
-	    enemiesSpawn(enemiesAmount, enemies[i], player, gameMap);
+	    enemies[i].spawn(player, gameMap);
 	}
 
 	wallsGeneration(gameMap);
@@ -297,14 +387,14 @@ void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&ma
             case 0: // Para cima
                 enemies.movement(mapGrid, player, hasMoved, 0, -1);
                 break;
-            case 1: // Para baixo
+            case 1: // Para direita
+                enemies.movement(mapGrid, player, hasMoved, 1);
+                break;
+            case 2: // Para baixo
                 enemies.movement(mapGrid, player, hasMoved, 0, 1);
                 break;
-            case 2: // Para esquerda
+            case 3: // Para esquerda
                 enemies.movement(mapGrid, player, hasMoved, -1);
-                break;
-            case 3: // Para direita
-                enemies.movement(mapGrid, player, hasMoved, 1);
                 break;
         }
         attempts++; // Aumenta o contador de tentativas
@@ -312,7 +402,7 @@ void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&ma
 }
 
 void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character player){
-    while(!hasMoved && attempts < 10){
+    while(!hasMoved && attempts < 10 && enemies.alive && player.alive){
         if(player.x - enemies.x > 0){
             enemies.movement(mapGrid, player, hasMoved, 1);
         } else if(player.x - enemies.x < 0){
@@ -368,15 +458,9 @@ void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, En
     mapGeneration(enemiesAmount, enemies, player, mapGrid);
 }
 
-// ========================================FIM DAS FUNÇÕES=================================================
-
-
-// ===============================================INICIO DO MAIN=================================================
-
-
-int main() {
-
-    ///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
+// Função de configurar o console pro jogo no início do código
+void configurarConsole(COORD &coord) {
+	///ALERTA: NAO MODIFICAR O TRECHO DE CODIGO, A SEGUIR.
         //INICIO: COMANDOS PARA QUE O CURSOR NAO FIQUE PISCANDO NA TELA
         HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
         CONSOLE_CURSOR_INFO     cursorInfo;
@@ -386,7 +470,6 @@ int main() {
         //FIM: COMANDOS PARA QUE O CURSOR NAO FIQUE PISCANDO NA TELA
         //INICIO: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
         short int CX=0, CY=0;
-        COORD coord;
         coord.X = CX;
         coord.Y = CY;
         //FIM: COMANDOS PARA REPOSICIONAR O CURSOR NO INICIO DA TELA
@@ -402,6 +485,19 @@ int main() {
         GetConsoleMode(hOut, &dwMode);
         SetConsoleMode(hOut, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
     ///FIM DO TRECHO
+}
+
+
+// ========================================FIM DAS FUNÇÕES=================================================
+
+
+// ===============================================INICIO DO MAIN=================================================
+
+
+int main() {
+
+	COORD coord;
+    configurarConsole(coord);
 
     cout << "\033[2J\033[H" << endl;
     cout << endl;
@@ -425,19 +521,27 @@ int main() {
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
         int enemiesAmount = 5;
 
+
+        for (int i = 0; i < 13; i++) {
+            for (int j = 0; j < 19; j++) {
+                GAME.explosionCountingGrid[i][j] = 0;
+            }
+        }
+
+
         ///Mapa do Jogo: 0- Caminho livre    1- Parede Indestrutível  2- Parede destrutível   3- Bomba   4- Explosão   5- Inimigo   6- Inimigo morto
         int mapGrid[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                                 1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
                                 1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,2,9,2,9,9,9,2,9,9,2,9,9,9,9,9,9,9,1,
+                                1,2,9,9,2,9,9,9,2,9,2,9,9,9,9,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,2,9,9,9,2,9,9,2,9,9,2,9,9,9,9,2,9,1,
+                                1,9,2,9,9,2,9,9,2,9,9,2,9,9,9,9,2,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,2,1,9,1,9,1,
-                                1,9,9,9,9,2,9,9,9,9,9,9,9,9,9,9,9,9,1,
+                                1,9,9,9,9,9,2,9,9,9,9,9,9,9,9,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,2,1,9,1,9,1,
                                 1,9,9,2,9,9,9,9,9,2,9,9,9,9,2,9,9,9,1,
                                 1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,9,1,
-                                1,9,9,2,9,9,9,9,9,9,2,9,9,9,9,9,9,9,1,
+                                1,9,9,9,2,9,9,9,9,9,2,9,9,9,9,9,9,9,1,
                                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
         // Inicialização da variável que armazena o timer do movimento dos inimigos.
@@ -491,7 +595,7 @@ int main() {
                             player.movement(mapGrid, enteredPortal, 1);
                             player.totalMovement +=1;
                         break;
-                        case 'f':
+                        case 13: case 32: case 'f':
                             // Se há espaço para colocar uma nova bomba, o F posiciona uma bomba na posição atual do jogador
                             if (player.totalBombsPlaced < player.maxConcurrentBombs && mapGrid[player.y][player.x] != 3) {
                                 mapGrid[player.y][player.x] = 3;
@@ -573,17 +677,17 @@ int main() {
                                                 enemies[i].movement(mapGrid, player, hasMoved, 0, -1);
                                                 break;
 
-                                            case 1: // Baixo
-                                                enemies[i].movement(mapGrid, player, hasMoved, 0, 1);
-                                                break;
+                                        case 1: // Direita
+                                            enemies[i].movement(mapGrid, player, hasMoved, 1);
+                                            break;
 
-                                            case 2: // Esquerda
-                                                enemies[i].movement(mapGrid, player, hasMoved, -1, 0);
-                                                break;
+                                        case 2: // Baixo
+                                            enemies[i].movement(mapGrid, player, hasMoved, 0, 1);
+                                            break;
 
-                                            case 3: // Direita
-                                                enemies[i].movement(mapGrid, player, hasMoved, 1, 0);
-                                                break;
+                                        case 3: // Esquerda
+                                            enemies[i].movement(mapGrid, player, hasMoved, -1);
+                                            break;
                                         }
                                     }
                                 }
@@ -605,22 +709,9 @@ int main() {
                  for (int k = 0; k < player.maxConcurrentBombs; k++) {
                     if (bombs[k].placed) {
                         bombs[k].texture = globalTimer(bombs[k].bombTimer, 3, bombs[k].placed, true);
-
                         if (!bombs[k].placed) {
-                            mapGrid[bombs[k].y][bombs[k].x] = 4;
-                            bombs[k].explosion.isExploding = true;
-                            bombs[k].explosion.x = bombs[k].x;
-                            bombs[k].explosion.y = bombs[k].y;
-                            bombCross(mapGrid, score, bombs[k].explosion.range, bombs[k].explosion);
-
-                            for (int i = 0; i < enemiesAmount; i++) {
-                                if (enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 4)
-                                    enemies[i].death(mapGrid[enemies[i].y][enemies[i].x], player);
-                            }
-
-                            bombs[k].explosion.explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
+                            bombs[k].explode(mapGrid, score, player, bombs, enemies, enemiesAmount);
                             cout << "\a"; // Som de EXPLOSAO (beep)
-                            if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
                         }
                     }
                 }
@@ -633,10 +724,9 @@ int main() {
                             player.alive = false;
 
                         globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
-
                         if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
-                            bombCross(mapGrid, score, bombs[k].explosion.range, bombs[k].explosion, true);
-                            mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] = 0;
+                            bombs[k].bombCross(mapGrid, score, player, bombs, enemies, enemiesAmount, true);
+                            reducePositiveCount(GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x], mapGrid[bombs[k].explosion.y][bombs[k].explosion.x], true);
                         }
                     }
                 }
@@ -669,8 +759,15 @@ int main() {
         else if(score >= enemiesAmount * 250)
             cout << "       Parabéns! Você matou todos os INIMIGOS! 🏅" << endl;
 
-        cout << "       Aperte uma tecla para voltar ao Menu.";
-        getch();
+        cout << "       Aperte ENTER para voltar ao Menu.";
+
+        while(true) {
+            char enter = _getch();
+
+            if (enter == 13) {
+                break;
+            }
+        }
     }
 
 
