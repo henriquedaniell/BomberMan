@@ -371,6 +371,7 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	                case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break; // Explosão
 	                case 5: cout << "👾 "; break; // Inimigo
 	                case 6: cout << "💀 "; break; // Morte do inimigo
+					case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com power
 	                case 8: cout << "🌀 "; break; // Portal para próxima fase
 	                //default: cout<<"-"; //erro
 	            } //Fim switch
@@ -555,6 +556,24 @@ int main() {
 
         mapGeneration(enemiesAmount, enemies, player, mapGrid);
 
+        int enemyRandomMoveChance;
+        float enemyMovementSpeed;
+
+        switch (difficulty) {
+            case 1:
+                enemyRandomMoveChance = 0;
+                enemyMovementSpeed = 1.5;
+            break;
+            case 2:
+                enemyRandomMoveChance = 1;
+                enemyMovementSpeed = 1;
+            break;
+            case 3:
+                enemyRandomMoveChance = 3;
+                enemyMovementSpeed = 0.7;
+            break;
+
+        }
 
         //Variavel para tecla pressionada
         char keyPressed;
@@ -623,7 +642,7 @@ int main() {
                 {
                     bool cannotMoveYet = true;
                     int intelligentMove = 0;
-                    globalTimer(enemiesMoveTimer, 1, cannotMoveYet);
+                    globalTimer(enemiesMoveTimer, enemyMovementSpeed, cannotMoveYet);
 
                     if (!cannotMoveYet) {
                         for(int i=0; i<enemiesAmount; i++){ // Processamento dos 4 inimigos
@@ -638,33 +657,14 @@ int main() {
                                 int oldX = enemies[i].x; // Guarda a posição antiga do inimigo.
                                 int oldY = enemies[i].y;
 
-                                switch(difficulty){
-                                    case 1:
-                                        randomEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
-                                        break;
-                                    case 2:
-                                        while(!hasMoved && attempts < 10 && enemies[i].alive && player.alive) // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
-                                        {
-                                            intelligentMove = ranIntelligentMove(gen);
-                                            if(intelligentMove == 0){
-                                                intelligentEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
-                                            } else{
-                                                randomEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
-                                            }
-                                        }
-                                        break;
-                                    case 3:
-                                        while(!hasMoved && attempts < 10 && enemies[i].alive && player.alive) // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
-                                        {
-                                            intelligentMove = ranIntelligentMove(gen);
-                                            if(intelligentMove <3){
-                                                intelligentEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
-                                            } else{
-                                                randomEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
-                                            }
-                                        }
-                                        break;
+
+                                intelligentMove = ranIntelligentMove(gen);
+                                if(intelligentMove >= enemyRandomMoveChance){
+                                    randomEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
+                                } else{
+                                    intelligentEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
                                 }
+
 
                                 if (!hasMoved && enemies[i].alive && player.alive) {
                                     int startDirection = ranDir(gen);
