@@ -294,16 +294,19 @@ string bombColor(int secondsRemaining) {
 }
 
 ///Sorteio das paredes que serão destrutíveis
-void wallsGeneration(int (&gameMap)[13][19]) {
+void wallsGeneration(int (&gameMap)[13][19], int maxPowerups, int &powerupsNumber) {
 	int randomWallGen = 0;
 	for(int i=0; i<13; i++){
 		for(int j=0; j<19; j++){
 			if(gameMap[i][j]==9){
 				randomWallGen = distrib(gen);
-				if(randomWallGen>35){
-					gameMap[i][j] = 0;
-				} else {
+				if (randomWallGen <= 35){
 					gameMap[i][j] = 2;
+				} else if (randomWallGen <= 50 && powerupsNumber < maxPowerups) {
+					gameMap[i][j] = 7;
+					powerupsNumber++;
+				} else {
+					gameMap[i][j] = 0;
 				}
 			}
 		}
@@ -320,12 +323,13 @@ void portalGeneration(int (&gameMap)[13][19]) {
     gameMap[randomPortalY][randomPortalX] = 8;
 }
 
-void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19]) {
+void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], int &powerupsNumber) {
+	int maxPowerups = 15;
 	for(int i=0; i<enemiesAmount; i++){
 	    enemies[i].spawn(player, gameMap);
 	}
 
-	wallsGeneration(gameMap);
+	wallsGeneration(gameMap, maxPowerups, powerupsNumber);
 	portalGeneration(gameMap);
 }
 
@@ -371,7 +375,7 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	                case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break; // Explosão
 	                case 5: cout << "👾 "; break; // Inimigo
 	                case 6: cout << "💀 "; break; // Morte do inimigo
-					case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com power
+					case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com powerup box
 	                case 8: cout << "🌀 "; break; // Portal para próxima fase
 	                //default: cout<<"-"; //erro
 	            } //Fim switch
@@ -496,7 +500,7 @@ void configurarConsole(COORD &coord) {
 
 
 int main() {
-
+	
 	COORD coord;
     configurarConsole(coord);
 
@@ -513,14 +517,14 @@ int main() {
     system("mode con: cols=70 lines=30");
 
 	// Inicialização da struct Character (player)
-    Character player{.maxConcurrentBombs = 1};
+    Character player;
 
     while(menu(alreadyPlayed)){
         cout << "\033[2J\033[H";
-        player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0;
+        player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0, player.maxConcurrentBombs = 1;
         score = 0;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
-        int enemiesAmount = 5;
+        int enemiesAmount = 5, powerupsNumber = 0;
 
 
         for (int i = 0; i < 13; i++) {
@@ -554,7 +558,7 @@ int main() {
         //Inicialização dos inimigos e suas respectivas posições
         Enemy enemies[enemiesAmount];
 
-        mapGeneration(enemiesAmount, enemies, player, mapGrid);
+        mapGeneration(enemiesAmount, enemies, player, mapGrid, powerupsNumber);
 
         int enemyRandomMoveChance;
         float enemyMovementSpeed;
@@ -748,7 +752,7 @@ int main() {
                 currentLevel++;
 
                 if(currentLevel < 4){
-                    nextLevel (mapGrid, enemiesAmount, player, enemies);
+                    nextLevel (mapGrid, enemiesAmount, player, enemies, powerupsNumber);
                 }
             }
         }
