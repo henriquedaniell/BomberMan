@@ -2,13 +2,13 @@
 
 using namespace std;
 
-string difficultyString = "F·cil";
+string difficultyString = "F√°cil";
 int difficulty = 1;
 
 void instructions(){
-    cout << "\033[2J\033[H"; // Apaga tudo que est· no console e move o cursor para o topo
+    cout << "\033[2J\033[H"; // Apaga tudo que est√° no console e move o cursor para o topo
     cout << endl;
-    cout <<     "            INSTRU«’ES          " << endl;
+    cout <<     "            INSTRU√á√ïES          " << endl;
     cout <<     " ================================" << endl;
     cout <<     "||    Bem-vindo ao BomberMan!   ||" << endl;
     cout <<     "||                              ||" << endl;
@@ -26,9 +26,9 @@ void instructions(){
 }
 
 void credits(){
-    cout << "\033[2J\033[H"; // Apaga tudo que est· no console e move o cursor para o topo
+    cout << "\033[2J\033[H"; // Apaga tudo que est√° no console e move o cursor para o topo
     cout << endl;
-    cout <<     "             CR…DITOS          " << endl;
+    cout <<     "             CR√âDITOS          " << endl;
     cout <<     " ================================" << endl;
     cout <<     "||                              ||" << endl;
     cout <<     "||                              ||" << endl;
@@ -46,22 +46,22 @@ void credits(){
 }
 
 void chooseDifficulty(int &difficulty, string &difficultyString){
-    cout << "\033[2J\033[H"; // Apaga tudo que est· no console e move o cursor para o topo
+    cout << "\033[2J\033[H"; // Apaga tudo que est√° no console e move o cursor para o topo
     cout << endl;
     cout <<     "        DIFICULDADE        "  << endl;
     cout <<     " ========================= " << endl;
     cout <<     "||                       ||" << endl;
-    cout <<     "||       1- F·cil        ||" << endl;
+    cout <<     "||       1- F√°cil        ||" << endl;
     cout <<     "||                       ||" << endl;
-    cout <<     "||       2- MÈdia        ||" << endl;
+    cout <<     "||       2- M√©dia        ||" << endl;
     cout <<     "||                       ||" << endl;
-    cout <<     "||      3- DifÌcil       ||" << endl;
+    cout <<     "||      3- Dif√≠cil       ||" << endl;
     cout <<     "||                       ||" << endl;
     cout <<     " ================================ " << endl;
     cout <<     "  Escolha a dificuldade: ";
     cin >> difficulty;
 
-    if (cin.fail()) {          // se usu·rio digitou letra, ignora e tenta dnv
+    if (cin.fail()) {          // se usu√°rio digitou letra, ignora e tenta dnv
             cin.clear();
             cin.ignore(10000, '\n');
             chooseDifficulty(difficulty, difficultyString);
@@ -70,13 +70,13 @@ void chooseDifficulty(int &difficulty, string &difficultyString){
 
 	switch(difficulty){
 		case 1:
-			difficultyString = "F·cil";
+			difficultyString = " [F√°cil] ";
 			break;
 		case 2:
-			difficultyString = "MÈdia";
+			difficultyString = " [M√©dia] ";
 			break;
 		case 3:
-			difficultyString = "DifÌcil";
+			difficultyString = "[Dif√≠cil]";
 			break;
 	}
 }
@@ -84,7 +84,7 @@ void chooseDifficulty(int &difficulty, string &difficultyString){
 bool menu(bool &alreadyPlayed){
     while (true) {
         int menuChoice = 0; // menu
-        cout << "\033[2J\033[H"; // Apaga tudo que est· no console e move o cursor para o topo
+        cout << "\033[2J\033[H"; // Apaga tudo que est√° no console e move o cursor para o topo
         cout << endl;
         cout <<     "         BOMBERMAN          " << endl;
         cout <<     " ========================== " << endl;
@@ -95,16 +95,16 @@ bool menu(bool &alreadyPlayed){
         } else {
             cout << "||   1- Jogar Novamente    ||" << endl;
         }
-        cout <<     "||  2- Dificuldade ("<<difficultyString<<")"<<"||" << endl;
-        cout <<     "||      3- InstruÁıes      ||" << endl;
-		cout <<     "||       4- CrÈditos       ||" << endl;
+        cout <<     "||2- Dificuldade "<<difficultyString<<"  "<<"||" << endl;
+        cout <<     "||      3- Instru√ß√µes      ||" << endl;
+		cout <<     "||       4- Cr√©ditos       ||" << endl;
 		cout <<     "||        5- Sair          ||" << endl;
         cout <<     "||                         ||" << endl;
         cout <<     " =========================== " << endl;
         cout <<     "     ESCOLHA UMA OPCAO: ";
         cin >> menuChoice;
 
-        if (cin.fail()) {          // se usu·rio digitou letra, ignora e tenta dnv
+        if (cin.fail()) {          // se usu√°rio digitou letra, ignora e tenta dnv
             cin.clear();
             cin.ignore(10000, '\n');
             continue;
