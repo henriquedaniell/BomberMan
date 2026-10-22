@@ -90,8 +90,12 @@ void reducePositiveCount(int &count, int &gridPos, bool resetGridValue = false) 
 // STRUCT JOGO
 struct GeneralGame {
 	int explosionCountingGrid[13][19] = {0};
+	int maxPowerUps = 15, powerupsNumber = 0;
 };
 GeneralGame GAME;
+
+enum PowerUpType {MORE_EXPLOSION_RANGE, EXTRA_BOMB, EXPLOSION_IMMNUNITY, NOCLIP, EXTREME_EXPLOSION};
+struct PowerUp {int x, y; PowerUpType type; bool collected = false;};
 
 // STRUCT DE PERSONAGEM JOGADOR
 struct Character {
@@ -307,8 +311,10 @@ string bombColor(int secondsRemaining) {
     return "\033[0m";
 }
 
-///Sorteio das paredes que serão destrutíveis
-void wallsGeneration(int (&gameMap)[13][19], int maxPowerups, int &powerupsNumber) {
+
+// FUNÇÕES PARA GERAÇÃO INICIAL DO MAPA ANTES DE CADA FASE
+// Sorteio das paredes que serão destrutíveis
+void wallsGeneration(int (&gameMap)[13][19], int &powerupsNumber, PowerUp (&powerups)[]) {
 	int randomWallGen = 0;
 	for(int i=0; i<13; i++){
 		for(int j=0; j<19; j++){
@@ -316,8 +322,15 @@ void wallsGeneration(int (&gameMap)[13][19], int maxPowerups, int &powerupsNumbe
 				randomWallGen = distrib(gen);
 				if (randomWallGen <= 35){
 					gameMap[i][j] = 2;
-				} else if (randomWallGen <= 50 && powerupsNumber < maxPowerups) {
+				} else if (randomWallGen <= 50 && powerupsNumber < GAME.maxPowerUps) {
 					gameMap[i][j] = 7;
+					powerups[powerupsNumber].x = j;
+					powerups[powerupsNumber].y = i;
+
+					uniform_int_distribution<> randomPowerUpType(0, 1);
+					int randIndex = randomPowerUpType(gen);
+					powerups[powerupsNumber].type = static_cast<PowerUpType>(randIndex);
+
 					powerupsNumber++;
 				} else {
 					gameMap[i][j] = 0;
@@ -327,6 +340,7 @@ void wallsGeneration(int (&gameMap)[13][19], int maxPowerups, int &powerupsNumbe
 	}
 }
 
+// Geração do portal de passagem de fase
 void portalGeneration(int (&gameMap)[13][19]) {
     int randomPortalX = 0;
     int randomPortalY = 0;
@@ -337,15 +351,17 @@ void portalGeneration(int (&gameMap)[13][19]) {
     gameMap[randomPortalY][randomPortalX] = 8;
 }
 
-void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], int &powerupsNumber) {
-	int maxPowerups = 15;
+void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], int &powerupsNumber, PowerUp (&powerups)[]) {
 	for(int i=0; i<enemiesAmount; i++){
 	    enemies[i].spawn(player, gameMap);
 	}
 
-	wallsGeneration(gameMap, maxPowerups, powerupsNumber);
+	wallsGeneration(gameMap, powerupsNumber, powerups);
 	portalGeneration(gameMap);
 }
+// FIM DAS FUNÇÕES PARA GERAÇÃO INICIAL DO MAPA ANTES DE CADA FASE
+
+
 
 // Função de timer global
 int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDuration, bool &timerTrigger, bool needTexture = false) {
@@ -366,6 +382,8 @@ int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDura
         return 0;
 }
 
+
+// FUNÇÃO DE DESENHAR O MAPA
 void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
 	///Imprime o jogo: mapa, personagem e inimigos.
 	for(int i=0;i<13;i++){
@@ -398,12 +416,15 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
 	    }
 	    cout << "\033[K\n";
 	} //Fim for mapa
-	
+
 	cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A\033[K" << endl;
 	cout << "                   Colocar Bomba - F\033[K" << endl;
 	cout << "                   PONTOS: " << score << "\033[K" << endl;
 }
+// FIM DA FUNÇÃO DE DESENHAR O MAPA
 
+
+// FUNÇÕES DE MOVIMENTOS DOS INIMIGOS
 void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character player){
     while(!hasMoved && attempts < 10 && enemies.alive && player.alive){ // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
         enemies.direction = ranDir(gen); // Sorteia uma direção
@@ -447,8 +468,12 @@ void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int
         attempts++;
     }
 }
+// FIM DAS FUNÇÕES DE MOVIMENTOS DOS INIMIGOS
 
-void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], int powerupsNumber){
+
+
+// FUNÇÃO DE PASSAR PARA A PROX FASE
+void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], int powerupsNumber, PowerUp (&powerups)[]){
     int newMap[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                         1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
                         1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
@@ -479,8 +504,11 @@ void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, En
         enemies[i].deathAnimation = false;
     }
 
-    mapGeneration(enemiesAmount, enemies, player, mapGrid, powerupsNumber);
+    mapGeneration(enemiesAmount, enemies, player, mapGrid, powerupsNumber, powerups);
 }
+// FIM DA FUNÇÃO DE PASSAR PARA A PROX FASE
+
+
 
 // Função de configurar o console pro jogo no início do código
 void configurarConsole(COORD &coord) {
@@ -543,7 +571,8 @@ int main() {
         player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0, player.maxConcurrentBombs = 1;
         score = 0;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
-        int enemiesAmount = 5, powerupsNumber = 0;
+        int enemiesAmount = 5;
+		GAME.powerupsNumber = 0;
 
 
         for (int i = 0; i < 13; i++) {
@@ -577,7 +606,9 @@ int main() {
         //Inicialização dos inimigos e suas respectivas posições
         Enemy enemies[enemiesAmount];
 
-        mapGeneration(enemiesAmount, enemies, player, mapGrid, powerupsNumber);
+		PowerUp powerups[GAME.maxPowerUps];
+
+        mapGeneration(enemiesAmount, enemies, player, mapGrid, GAME.powerupsNumber, powerups);
 
         int enemyRandomMoveChance;
         float enemyMovementSpeed;
@@ -612,8 +643,8 @@ int main() {
                 drawMap(mapGrid, player, bombs, score);
 
 
-                
-                cout << "                   Powerups: " << powerupsNumber << "\033[K" << endl;
+
+                cout << "                   Powerups: " << GAME.powerupsNumber << "\033[K" << endl;
 
                 ///Executa os movimentos
                 if ( _kbhit() ){
@@ -621,19 +652,19 @@ int main() {
                     switch(keyPressed)
                     {
                         case 72: case 'w': /// Cima
-                            player.movement(mapGrid, enteredPortal, powerupsNumber, 0, -1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerupsNumber, 0, -1);
                             player.totalMovement +=1;
                         break;
                         case 80: case 's': /// Baixo
-                            player.movement(mapGrid, enteredPortal, powerupsNumber, 0, 1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerupsNumber, 0, 1);
                             player.totalMovement +=1;
                         break;
                         case 75:case 'a': /// Esquerda
-                            player.movement(mapGrid, enteredPortal, powerupsNumber, -1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerupsNumber, -1);
                             player.totalMovement +=1;
                         break;
                         case 77: case 'd': /// Direita
-                            player.movement(mapGrid, enteredPortal, powerupsNumber, 1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerupsNumber, 1);
                             player.totalMovement +=1;
                         break;
                         case 13: case 32: case 'f':
@@ -770,8 +801,8 @@ int main() {
                 currentLevel++;
 
                 if(currentLevel < 4){
-					powerupsNumber = 0;
-                    nextLevel (mapGrid, enemiesAmount, player, enemies, powerupsNumber);
+					GAME.powerupsNumber = 0;
+                    nextLevel (mapGrid, enemiesAmount, player, enemies, GAME.powerupsNumber, powerups);
                 }
             }
         }
