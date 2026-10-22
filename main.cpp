@@ -99,7 +99,7 @@ struct Character {
 
     bool alive = true;
 
-    void movement(int gameMap[13][19], bool &enteredPortal, int newX = 0, int newY = 0) {
+    void movement(int gameMap[13][19], bool &enteredPortal, int &powerupsNumber, int newX = 0, int newY = 0) {
         if (gameMap[y + newY][x + newX] == 0) {
             x += newX;           // Move o player caso haja caminho livre
             y += newY;
@@ -107,6 +107,12 @@ struct Character {
         else if(gameMap[y + newY][x + newX] == 5 || gameMap[y + newY][x + newX] == 4) {
             alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
         }
+		else if (gameMap[y + newY][x + newX] == 9) {
+			x += newX;
+            y += newY;
+			powerupsNumber--;
+			gameMap[y][x] = 0;
+		}
         else if(gameMap[y + newY][x + newX] == 8){
             enteredPortal = true;
 		}
@@ -236,11 +242,19 @@ struct Bomb {
                             GAME.explosionCountingGrid[newY][newX]++;
 						}
 						break;
-					case 0: case 5:
+					case 0: case 5: case 9:
 						if (!clearExplosion) {
                             GAME.explosionCountingGrid[newY][newX] = 1;
 							gridPos = 4;
 						}
+						break;
+					case 7:
+						if (!clearExplosion) {
+							gridPos = 9;
+                            player.totalWallsBroken++;
+						}
+						hitWall = true;
+                        score += 10;
 						break;
                     case 6: case 8:
                         if (clearExplosion) {
@@ -352,7 +366,7 @@ int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDura
         return 0;
 }
 
-void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
+void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
 	///Imprime o jogo: mapa, personagem e inimigos.
 	for(int i=0;i<13;i++){
 	    for(int j=0;j<19;j++){
@@ -377,12 +391,17 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	                case 6: cout << "💀 "; break; // Morte do inimigo
 					case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com powerup box
 	                case 8: cout << "🌀 "; break; // Portal para próxima fase
+					case 9: cout << "🌟 "; break; // powerup
 	                //default: cout<<"-"; //erro
 	            } //Fim switch
 	        }
 	    }
 	    cout << "\033[K\n";
 	} //Fim for mapa
+	
+	cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A\033[K" << endl;
+	cout << "                   Colocar Bomba - F\033[K" << endl;
+	cout << "                   PONTOS: " << score << "\033[K" << endl;
 }
 
 void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character player){
@@ -429,7 +448,7 @@ void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int
     }
 }
 
-void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[]){
+void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], int powerupsNumber){
     int newMap[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                         1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
                         1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
@@ -460,7 +479,7 @@ void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, En
         enemies[i].deathAnimation = false;
     }
 
-    mapGeneration(enemiesAmount, enemies, player, mapGrid);
+    mapGeneration(enemiesAmount, enemies, player, mapGrid, powerupsNumber);
 }
 
 // Função de configurar o console pro jogo no início do código
@@ -500,7 +519,7 @@ void configurarConsole(COORD &coord) {
 
 
 int main() {
-	
+
 	COORD coord;
     configurarConsole(coord);
 
@@ -590,12 +609,11 @@ int main() {
                 SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
                 // Imprime o jogo: mapa, personagem e inimigos.
-                drawMap(mapGrid, player, bombs);
+                drawMap(mapGrid, player, bombs, score);
 
 
-                cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A\033[K" << endl;
-                cout << "                   Colocar Bomba - F\033[K" << endl;
-                cout << "                   PONTOS: " << score << "\033[K" << endl;
+                
+                cout << "                   Powerups: " << powerupsNumber << "\033[K" << endl;
 
                 ///Executa os movimentos
                 if ( _kbhit() ){
@@ -603,19 +621,19 @@ int main() {
                     switch(keyPressed)
                     {
                         case 72: case 'w': /// Cima
-                            player.movement(mapGrid, enteredPortal, 0, -1);
+                            player.movement(mapGrid, enteredPortal, powerupsNumber, 0, -1);
                             player.totalMovement +=1;
                         break;
                         case 80: case 's': /// Baixo
-                            player.movement(mapGrid, enteredPortal, 0, 1);
+                            player.movement(mapGrid, enteredPortal, powerupsNumber, 0, 1);
                             player.totalMovement +=1;
                         break;
                         case 75:case 'a': /// Esquerda
-                            player.movement(mapGrid, enteredPortal, -1);
+                            player.movement(mapGrid, enteredPortal, powerupsNumber, -1);
                             player.totalMovement +=1;
                         break;
                         case 77: case 'd': /// Direita
-                            player.movement(mapGrid, enteredPortal, 1);
+                            player.movement(mapGrid, enteredPortal, powerupsNumber, 1);
                             player.totalMovement +=1;
                         break;
                         case 13: case 32: case 'f':
@@ -752,6 +770,7 @@ int main() {
                 currentLevel++;
 
                 if(currentLevel < 4){
+					powerupsNumber = 0;
                     nextLevel (mapGrid, enemiesAmount, player, enemies, powerupsNumber);
                 }
             }
