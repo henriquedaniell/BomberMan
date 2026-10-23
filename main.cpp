@@ -40,6 +40,8 @@ int currentLevel = 1; // Controla a fase
 bool enteredPortal = false; // Confirma se entrou no portal
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 
+enum PowerUpType {NOT_PLACED, MORE_EXPLOSION_RANGE, EXTRA_BOMB, EXPLOSION_IMMNUNITY, NOCLIP, EXTREME_EXPLOSION};
+
 
 // =================FUNCAO DE DIRECOES================
 int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y, bool explosion = false, int* newX = nullptr, int* newY = nullptr) {
@@ -86,24 +88,51 @@ void reducePositiveCount(int &count, int &gridPos, bool resetGridValue = false) 
 
 // STRUCT JOGO
 struct GeneralGame {
-	int explosionCountingGrid[13][19] = {0};
+	int 			explosionCountingGrid[13][19] = {0};
+	PowerUpType		powerUpGrid[13][19] = {static_cast<PowerUpType>(0)};
+	int 			maxPowerUps = 15, powerUpsNumber = 0;
 };
 GeneralGame GAME;
 
+
+struct PowerUp {int x, y; PowerUpType type; bool collected = false;};
+
 // STRUCT DE PERSONAGEM JOGADOR
 struct Character {
-    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
+    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0, range = 1, lastPowerUpPicked;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
 
-    bool alive = true;
+    bool alive = true, immuneToExplosion = false;
 
-    void movement(int gameMap[13][19], bool &enteredPortal, int newX = 0, int newY = 0) {
-        if (gameMap[y + newY][x + newX] == 0) {
+    void movement(int gameMap[13][19], bool &enteredPortal, int &powerUpsNumber, int newX = 0, int newY = 0) {
+        if (gameMap[y + newY][x + newX] == 0 || (gameMap[y + newY][x + newX] == 4 && immuneToExplosion)) {
             x += newX;           // Move o player caso haja caminho livre
             y += newY;
         }
-        else if(gameMap[y + newY][x + newX] == 5 || gameMap[y + newY][x + newX] == 4 || gameMap[y + newY][x + newX] == 10) {
-            alive = false; // Player morre se der de cara com um inimigo, com uma casa de explosão da bomba ou com o boss
+        else if(gameMap[y + newY][x + newX] == 5 || (gameMap[y + newY][x + newX] == 4 && !immuneToExplosion) || gameMap[y + newY][x + newX] == 10) {
+            alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
         }
+		else if (gameMap[y + newY][x + newX] == 9) {
+			x += newX;
+            y += newY;
+			powerUpsNumber--;
+			gameMap[y][x] = 0;
+
+			switch (GAME.powerUpGrid[y][x]) {
+                case MORE_EXPLOSION_RANGE:
+                    if (range < 10)
+                        range++;
+                    break;
+                case EXTRA_BOMB:
+                    if (maxConcurrentBombs < 5)
+                        maxConcurrentBombs++;
+                    break;
+				case EXPLOSION_IMMNUNITY:
+					immuneToExplosion = true;
+					break;
+			}
+
+			GAME.powerUpGrid[y][x] = static_cast<PowerUpType>(0);
+		}
         else if(gameMap[y + newY][x + newX] == 8){
             enteredPortal = true;
 		}
@@ -255,11 +284,23 @@ struct Bomb {
                             GAME.explosionCountingGrid[newY][newX]++;
 						}
 						break;
-					case 0: case 5:
+					case 0: case 5: case 9:
 						if (!clearExplosion) {
-                            GAME.explosionCountingGrid[newY][newX] = 1;
+							if (gridPos == 9) {
+                                GAME.powerUpsNumber--;
+                                GAME.powerUpGrid[newY][newX] = static_cast<PowerUpType>(0);
+							}
+							GAME.explosionCountingGrid[newY][newX] = 1;
 							gridPos = 4;
 						}
+						break;
+					case 7:
+						if (!clearExplosion) {
+							gridPos = 9;
+                            player.totalWallsBroken++;
+						}
+						hitWall = true;
+                        score += 10;
 						break;
                     case 6: case 8:
                         if (clearExplosion) {
@@ -329,23 +370,39 @@ string bombColor(int secondsRemaining) {
     return "\033[0m";
 }
 
-///Sorteio das paredes que serão destrutíveis
-void wallsGeneration(int (&gameMap)[13][19]) {
+
+// FUNÇÕES PARA GERAÇÃO INICIAL DO MAPA ANTES DE CADA FASE
+// Sorteio das paredes que serão destrutíveis
+void wallsGeneration(int (&gameMap)[13][19], int &powerUpsNumber, PowerUp (&powerUps)[]) {
 	int randomWallGen = 0;
 	for(int i=0; i<13; i++){
 		for(int j=0; j<19; j++){
 			if(gameMap[i][j]==9){
 				randomWallGen = distrib(gen);
-				if(randomWallGen>35){
-					gameMap[i][j] = 0;
-				} else {
+				if (randomWallGen <= 35){
 					gameMap[i][j] = 2;
+				} else if (randomWallGen <= 50 && powerUpsNumber < GAME.maxPowerUps) {
+					gameMap[i][j] = 7;
+					powerUps[powerUpsNumber].x = j;
+					powerUps[powerUpsNumber].y = i;
+
+					uniform_int_distribution<> randomPowerUpType(1, 3);
+					int randIndex = randomPowerUpType(gen);
+					PowerUpType powerUpType = static_cast<PowerUpType>(randIndex);
+
+					powerUps[powerUpsNumber].type = powerUpType;
+					GAME.powerUpGrid[i][j] = powerUpType;
+
+					powerUpsNumber++;
+				} else {
+					gameMap[i][j] = 0;
 				}
 			}
 		}
 	}
 }
 
+// Geração do portal de passagem de fase
 void portalGeneration(int (&gameMap)[13][19]) {
     int randomPortalX = 0;
     int randomPortalY = 0;
@@ -356,19 +413,21 @@ void portalGeneration(int (&gameMap)[13][19]) {
     gameMap[randomPortalY][randomPortalX] = 8;
 }
 
-void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], Enemy &boss) {
-
+void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], int &powerUpsNumber, PowerUp (&powerUps)[], Enemy &boss) {
 	for(int i=0; i<enemiesAmount; i++){
 	    enemies[i].spawn(player, gameMap);
 	}
 
-	wallsGeneration(gameMap);
+	wallsGeneration(gameMap, powerUpsNumber, powerUps);
 	portalGeneration(gameMap);
 
     if(currentLevel == 4)
         spawnBoss(boss, gameMap);
 
 }
+// FIM DAS FUNÇÕES PARA GERAÇÃO INICIAL DO MAPA ANTES DE CADA FASE
+
+
 
 // Função de timer global
 int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDuration, bool &timerTrigger, bool needTexture = false) {
@@ -389,12 +448,17 @@ int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDura
         return 0;
 }
 
-void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
+
+// FUNÇÃO DE DESENHAR O MAPA
+void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
 	///Imprime o jogo: mapa, personagem e inimigos.
 	for(int i=0;i<13;i++){
 	    for(int j=0;j<19;j++){
 	        if(i==player.y && j==player.x){
-	            cout<< "🤠 "; //Personagem
+                if (player.immuneToExplosion)
+                    cout<< "😇 "; //Personagem
+                else
+                    cout<< "🤠 "; //Personagem
 	        } else {
 	            switch (gameMap[i][j]){
 	                case 0: cout<<"   "; break; //Caminho
@@ -412,16 +476,35 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	                case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break; // Explosão
 	                case 5: cout << "👾 "; break; // Inimigo
 	                case 6: cout << "💀 "; break; // Morte do inimigo
-					case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com power
+					        case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com powerup box
 	                case 8: cout << "🌀 "; break; // Portal para próxima fase
-	                case 10: cout << "😈 "; break; // Boss
-	                //default: cout<<"-"; //erro
+					        case 9: {
+					          switch (GAME.powerUpGrid[i][j]) {
+                      case MORE_EXPLOSION_RANGE:
+                          cout << "\033[92m" << "🔥+" << "\033[0m"; break; // powerup
+                          break;
+                      case EXTRA_BOMB:
+								          cout << "\033[92m" << "🧨+" << "\033[0m"; break; // powerup
+                          break;
+							        case EXPLOSION_IMMNUNITY:
+								          cout << "\033[92m" << "🛡️+" << "\033[0m"; break; // powerup
+								          break;
+					          }
+                 }
+	               case 10: cout << "😈 "; break; // Boss
+	               //default: cout<<"-"; //erro
 	            } //Fim switch
 	        }
 	    }
 	    cout << "\033[K\n";
 	} //Fim for mapa
+
+	cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A\033[K" << endl;
+	cout << "                   Colocar Bomba - F\033[K" << endl;
+	cout << "                   PONTOS: " << score << "\033[K" << endl;
 }
+// FIM DA FUNÇÃO DE DESENHAR O MAPA
+
 
 void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character &player, int i){
     while(!hasMoved && attempts < 10 && enemies.lifes && player.alive){ // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
@@ -462,8 +545,12 @@ void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int
         attempts++;
     }
 }
+// FIM DAS FUNÇÕES DE MOVIMENTOS DOS INIMIGOS
 
-void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], Enemy &boss, Bomb bombs[]){
+
+
+// FUNÇÃO DE PASSAR PARA A PROX FASE
+void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], int powerUpsNumber, PowerUp (&powerUps)[], Enemy &boss, Bomb bombs[]){
     int newMap[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                         1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
                         1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
@@ -510,8 +597,11 @@ void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, En
         enemies[i].deathAnimation = false;
     }
 
-    mapGeneration(enemiesAmount, enemies, player, mapGrid, boss);
+    mapGeneration(enemiesAmount, enemies, player, mapGrid, powerUpsNumber, powerUps, boss);
 }
+// FIM DA FUNÇÃO DE PASSAR PARA A PROX FASE
+
+
 
 // Função de configurar o console pro jogo no início do código
 void configurarConsole(COORD &coord) {
@@ -567,16 +657,18 @@ int main() {
     system("mode con: cols=70 lines=30");
 
 	// Inicialização da struct Character (player)
-    Character player{.maxConcurrentBombs = 1};
+    Character player;
 
     while(menu(alreadyPlayed)){
         cout << "\033[2J\033[H";
-        player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0;
+		player = {.x = 1, .y = 1, .maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .alive = true, .immuneToExplosion = false};
+        // player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0, player.maxConcurrentBombs = 1, player.immuneToExplosion = false, player.range = 1;
         score = 0;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
         currentLevel = 1;
         enteredPortal = false;
         int enemiesAmount = 5;
+		GAME.powerUpsNumber = 0;
 
 
         for (int i = 0; i < 13; i++) {
@@ -611,10 +703,12 @@ int main() {
         //Inicialização dos inimigos e suas respectivas posições
         Enemy enemies[enemiesAmount];
 
-        //Inicialização do boss
+		    //Inicialização do boss
         Enemy boss;
+        
+        PowerUp powerUps[GAME.maxPowerUps];
 
-        mapGeneration(enemiesAmount, enemies, player, mapGrid, boss);
+        mapGeneration(enemiesAmount, enemies, player, mapGrid, GAME.powerUpsNumber, powerUps, boss);
 
         int enemyRandomMoveChance;
         float enemyMovementSpeed;
@@ -650,12 +744,11 @@ int main() {
                 SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
                 // Imprime o jogo: mapa, personagem e inimigos.
-                drawMap(mapGrid, player, bombs);
+                drawMap(mapGrid, player, bombs, score);
 
 
-                cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A\033[K" << endl;
-                cout << "                   Colocar Bomba - F\033[K" << endl;
-                cout << "                   PONTOS: " << score << "\033[K" << endl;
+
+                cout << "                   Powerups: " << GAME.powerUpsNumber << "\033[K" << endl;
 
                 ///Executa os movimentos
                 if ( _kbhit() ){
@@ -663,19 +756,19 @@ int main() {
                     switch(keyPressed)
                     {
                         case 72: case 'w': /// Cima
-                            player.movement(mapGrid, enteredPortal, 0, -1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, 0, -1);
                             player.totalMovement +=1;
                         break;
                         case 80: case 's': /// Baixo
-                            player.movement(mapGrid, enteredPortal, 0, 1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, 0, 1);
                             player.totalMovement +=1;
                         break;
                         case 75:case 'a': /// Esquerda
-                            player.movement(mapGrid, enteredPortal, -1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, -1);
                             player.totalMovement +=1;
                         break;
                         case 77: case 'd': /// Direita
-                            player.movement(mapGrid, enteredPortal, 1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, 1);
                             player.totalMovement +=1;
                         break;
                         case 13: case 32: case 'f':
@@ -688,6 +781,7 @@ int main() {
                                         bombs[k].x = player.x;
                                         bombs[k].y = player.y;
                                         bombs[k].placed = true;
+                                        bombs[k].explosion.range = player.range;
                                         bombs[k].bombTimer = chrono::steady_clock::now(); // Define o tempo em que a bomba foi posicionada
                                         break;
                                     }
@@ -836,7 +930,7 @@ int main() {
                 // timer da explosão da bomba (DURANTE A EXPLOSÃO)
                 for (int k = 0; k < player.maxConcurrentBombs; k++) {
                     if (bombs[k].explosion.isExploding) { //Duração da explosão
-                        if (mapGrid[player.y][player.x] == 4) // Mata o jogador se ele andar enquanto a explosão está ativa
+                        if (mapGrid[player.y][player.x] == 4 && !player.immuneToExplosion) // Mata o jogador se ele andar enquanto a explosão está ativa
                             player.alive = false;
 
                         globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
@@ -886,7 +980,8 @@ int main() {
                         currentLevel++;
 
                         if (currentLevel < 5) {
-                            nextLevel(mapGrid, enemiesAmount, player, enemies, boss, bombs);
+                            GAME.powerUpsNumber = 0;
+                            nextLevel(mapGrid, enemiesAmount, player, enemies, GAME.powerUpsNumber, powerUps, boss, bombs);
                         }
                     }
                     else {
