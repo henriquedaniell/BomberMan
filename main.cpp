@@ -202,7 +202,7 @@ struct Bomb {
 
 
 	struct Explosion {
-		int x, y, range = 1;
+		int x, y, range = 5;
 		bool isExploding = false; // Variavel para o timer da explosao
 
 		// Inicialização variavel que armazena o timer da explosao
@@ -358,15 +358,16 @@ void portalGeneration(int (&gameMap)[13][19]) {
 
 void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], Enemy &boss) {
 
-	if(currentLevel == 4)
-        spawnBoss(boss, gameMap);
-
 	for(int i=0; i<enemiesAmount; i++){
 	    enemies[i].spawn(player, gameMap);
 	}
 
 	wallsGeneration(gameMap);
 	portalGeneration(gameMap);
+
+    if(currentLevel == 4)
+        spawnBoss(boss, gameMap);
+
 }
 
 // Função de timer global
@@ -893,22 +894,58 @@ int main() {
                     }
             }
         }
-        ///Mensagem de fim de jogo
-        if(player.alive == false)
-            cout << "       Você morreu..." << endl;
-        else if(currentLevel == 5)
-            cout << "       Parabéns! Você venceu todos os inimigos! 🏅" << endl;
+        cout << "\033[2J\033[H";
 
-        cout << "       STATUS:                                    " << endl;
+        cout << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << "  |               RESULTADO DA PARTIDA             |" << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << "  |                                                |" << endl;
+
+        if (player.alive == false) {
+            cout << "  |                VOCE MORREU!                    |" << endl;
+        }
+        else if (currentLevel == 5) {
+            cout << "  |             PARABENS, VOCE VENCEU!             |" << endl;
+        }
+
+        cout << "  |                                                |" << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << "  |                  SEUS STATUS                  |" << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << "  |                                                |" << endl;
+
+        cout << "  |  Fase alcancada:       "
+             << currentLevel << "                            |" << endl;
+
+        cout << "  |  Pontuacao final:      "
+             << score << "                         |" << endl;
+
+        cout << "  |  Inimigos eliminados:  "
+             << player.enemiesKilled << "                            |" << endl;
+
+        cout << "  |  Paredes quebradas:    "
+             << player.totalWallsBroken << "                            |" << endl;
+
+        cout << "  |  Bombas colocadas:     "
+             << player.bombsPlaced << "                            |" << endl;
+
+        cout << "  |  Movimentos realizados:"
+             << player.totalMovement << "                            |" << endl;
+
+        cout << "  |                                                |" << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << endl;
         cout << "       Aperte ENTER para voltar ao Menu.";
 
-        while(true) {
+        while (true) {
             char enter = _getch();
 
             if (enter == 13) {
                 break;
             }
         }
+
     }
 
 
