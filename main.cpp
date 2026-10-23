@@ -1,8 +1,5 @@
-/**
-    Estrutura inicial para um jogo
-    versão: 0.1 (Prof. Alex,  Adaptado Prof. Felski)
-*/
 /// BomberMan (Alunos: Henrique Daniel e Eduardo Ramos
+
 #include <iostream>
 #include <windows.h>
 #include <conio.h>
@@ -104,8 +101,8 @@ struct Character {
             x += newX;           // Move o player caso haja caminho livre
             y += newY;
         }
-        else if(gameMap[y + newY][x + newX] == 5 || gameMap[y + newY][x + newX] == 4) {
-            alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
+        else if(gameMap[y + newY][x + newX] == 5 || gameMap[y + newY][x + newX] == 4 || gameMap[y + newY][x + newX] == 10) {
+            alive = false; // Player morre se der de cara com um inimigo, com uma casa de explosão da bomba ou com o boss
         }
         else if(gameMap[y + newY][x + newX] == 8){
             enteredPortal = true;
@@ -115,8 +112,8 @@ struct Character {
 
 // STRUCT DOS INIMIGOS
 struct Enemy {
-    int x, y, direction=0;
-    bool alive = true, deathAnimation = false;
+    int x, y, direction=0, lifes = 1;
+    bool deathAnimation = false;
     chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
 
 
@@ -146,7 +143,7 @@ struct Enemy {
     }
 
 
-	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int newX = 0, int newY = 0) {
+	void movement(int (&gameMap)[13][19], Character &player, bool &hasMoved, int i, int newX = 0, int newY = 0) {
 		if (x + newX == player.x && y + newY == player.y) 	// Mata o player se o inimigo encostar nele
 		    player.alive = false;
 		else if (gameMap[y + newY][x + newX] == 0){ 				// Move o inimigo para o novo local caso seja caminho livre
@@ -154,21 +151,43 @@ struct Enemy {
 			y += newY;
 		    hasMoved = true;
 		} else if(gameMap[y + newY][x + newX] == 4){ // Se for explosão
-		    gameMap[y][x] = 0;    // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
-		    x += newX;                     // Inimigo anda
-			y += newY;
-		    death(gameMap[y][x], player);
+		    if(i>-1){
+                gameMap[y][x] = 0;    // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
+                x += newX;                     // Inimigo anda
+                y += newY;
+                death(gameMap[y][x], i, player);
+		    }
 		}
 	}
 
-	void death (int &gridPos, Character &player) {
-		alive = false;
+	void death (int &gridPos, int i, Character &player) {
+        if(lifes <=0)
+            return;
+
+		if(i>-1)
+            lifes--;
 		deathTimer = chrono::steady_clock::now();
 		score += 250;
 		gridPos = 6;
 		if (GAME.explosionCountingGrid[y][x] > 0)
             GAME.explosionCountingGrid[y][x]--;
 		player.enemiesKilled += 1;
+	}
+
+	void damage(int &gridPos) {
+	    if(lifes <=0)
+            return;
+
+		lifes--;
+		if(lifes == 0){
+            deathTimer = chrono::steady_clock::now();
+            deathAnimation = true;
+            score += 250;
+            gridPos = 6;
+
+            if (GAME.explosionCountingGrid[y][x] > 0)
+                GAME.explosionCountingGrid[y][x]--;
+		}
 	}
 };
 
@@ -183,7 +202,7 @@ struct Bomb {
 
 
 	struct Explosion {
-		int x, y, range = 1;
+		int x, y, range = 5;
 		bool isExploding = false; // Variavel para o timer da explosao
 
 		// Inicialização variavel que armazena o timer da explosao
@@ -194,7 +213,7 @@ struct Bomb {
 
 
 	// Função da área de explosão da bomba
-	void bombCross(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], int enemiesAmount, bool clearExplosion = false){
+	void bombCross(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], Enemy &boss, int enemiesAmount, bool clearExplosion = false){
 		for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
 			bool hitWall = false;
 			int explosionRange = explosion.range;
@@ -221,7 +240,7 @@ struct Bomb {
                             for (int k = 0; k < player.maxConcurrentBombs; k++) {
                                 if (bombs[k].x == newX && bombs[k].y == newY && bombs[k].placed) {
                                     bombs[k].placed = false;
-                                    bombs[k].explode(gameMap, score, player, bombs, enemies, enemiesAmount);
+                                    bombs[k].explode(gameMap, score, player, bombs, enemies, boss, enemiesAmount);
 									GAME.explosionCountingGrid[newY][newX]++;
                                     break;
                                 }
@@ -249,6 +268,12 @@ struct Bomb {
                             GAME.explosionCountingGrid[newY][newX]++;
                         }
                         break;
+                    case 10:
+                        if (!clearExplosion && boss.lifes > 0) {
+                                boss.damage(gridPos);
+                        }
+                        hitWall = true;
+                        break;
 				}
 
 				if (hitWall)
@@ -259,18 +284,19 @@ struct Bomb {
 
 	}
 
-	void explode(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], int enemiesAmount) {
+	void explode(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], Enemy &boss, int enemiesAmount) {
 		gameMap[y][x] = 4;
 		GAME.explosionCountingGrid[y][x]++;
 		explosion.isExploding = true;
 		explosion.x = x;
 		explosion.y = y;
-		bombCross(gameMap, score, player, bombs, enemies, enemiesAmount);
+		bombCross(gameMap, score, player, bombs, enemies, boss, enemiesAmount);
 
 		for (int i = 0; i < enemiesAmount; i++) {
-		    if (enemies[i].alive && gameMap[enemies[i].y][enemies[i].x] == 4)
-		        enemies[i].death(gameMap[enemies[i].y][enemies[i].x], player);
+		    if (enemies[i].lifes > 0 && gameMap[enemies[i].y][enemies[i].x] == 4)
+		        enemies[i].death(gameMap[enemies[i].y][enemies[i].x], i, player);
 		}
+
 
 		explosion.explosionTimer = chrono::steady_clock::now(); // define o tempo em que a bomba explodiu
 		if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
@@ -281,6 +307,16 @@ struct Bomb {
 
 
 // ========================================INICIO DAS FUNÇÕES===============================================
+
+// Criação do Boss
+void spawnBoss(Enemy &boss, int (&mapGrid)[13][19]){
+    boss.lifes = 3;
+    boss.x = 17;
+    boss.y = 11;
+    boss.deathAnimation = false;
+
+    mapGrid[boss.y][boss.x] = 10;
+}
 
 // Função para pintar o pavio da bomba
 string bombColor(int secondsRemaining) {
@@ -320,13 +356,18 @@ void portalGeneration(int (&gameMap)[13][19]) {
     gameMap[randomPortalY][randomPortalX] = 8;
 }
 
-void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19]) {
+void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], Enemy &boss) {
+
 	for(int i=0; i<enemiesAmount; i++){
 	    enemies[i].spawn(player, gameMap);
 	}
 
 	wallsGeneration(gameMap);
 	portalGeneration(gameMap);
+
+    if(currentLevel == 4)
+        spawnBoss(boss, gameMap);
+
 }
 
 // Função de timer global
@@ -373,6 +414,7 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	                case 6: cout << "💀 "; break; // Morte do inimigo
 					case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com power
 	                case 8: cout << "🌀 "; break; // Portal para próxima fase
+	                case 10: cout << "😈 "; break; // Boss
 	                //default: cout<<"-"; //erro
 	            } //Fim switch
 	        }
@@ -381,51 +423,47 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
 	} //Fim for mapa
 }
 
-void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character player){
-    while(!hasMoved && attempts < 10 && enemies.alive && player.alive){ // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
+void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character &player, int i){
+    while(!hasMoved && attempts < 10 && enemies.lifes && player.alive){ // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
         enemies.direction = ranDir(gen); // Sorteia uma direção
         switch(enemies.direction){
             case 0: // Para cima
-                enemies.movement(mapGrid, player, hasMoved, 0, -1);
+                enemies.movement(mapGrid, player, hasMoved, i, 0, -1);
                 break;
             case 1: // Para direita
-                enemies.movement(mapGrid, player, hasMoved, 1);
+                enemies.movement(mapGrid, player, hasMoved, i, 1);
                 break;
             case 2: // Para baixo
-                enemies.movement(mapGrid, player, hasMoved, 0, 1);
+                enemies.movement(mapGrid, player, hasMoved, i, 0, 1);
                 break;
             case 3: // Para esquerda
-                enemies.movement(mapGrid, player, hasMoved, -1);
+                enemies.movement(mapGrid, player, hasMoved, i, -1);
                 break;
         }
         attempts++; // Aumenta o contador de tentativas
     }
 }
 
-void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character player){
-    while(!hasMoved && attempts < 10 && enemies.alive && player.alive){
-        if(player.x - enemies.x > 0){
-            enemies.movement(mapGrid, player, hasMoved, 1);
-        } else if(player.x - enemies.x < 0){
-            enemies.movement(mapGrid, player, hasMoved, -1);
-        }
+void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character &player, int i){
+    while(!hasMoved && attempts < 10 && enemies.lifes > 0 && player.alive){
+
+        if(player.x > enemies.x)
+            enemies.movement(mapGrid, player, hasMoved, i, 1);
+        else if(player.x < enemies.x)
+            enemies.movement(mapGrid, player, hasMoved, i, -1);
+
         if(!hasMoved){
-            if(player.y - enemies.y > 0){
-                enemies.movement(mapGrid, player, hasMoved, 0, 1);
-            } else if(player.y - enemies.y < 0){
-                enemies.movement(mapGrid, player, hasMoved, 0, -1);
-            }
-            if(player.y - enemies.y == 0){
-                enemies.movement(mapGrid, player, hasMoved, 1);
-            } else if(!hasMoved){
-                enemies.movement(mapGrid, player, hasMoved, -1);
-            }
+            if(player.y > enemies.y)
+                enemies.movement(mapGrid, player, hasMoved, i, 0, 1);
+            else if(player.y < enemies.y)
+                enemies.movement(mapGrid, player, hasMoved, i, 0, -1);
         }
+
         attempts++;
     }
 }
 
-void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[]){
+void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], Enemy &boss, Bomb bombs[]){
     int newMap[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                         1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
                         1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
@@ -446,17 +484,33 @@ void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, En
         }
     }
 
+    for (int i = 0; i < 13; i++) {
+        for (int j = 0; j < 19; j++) {
+            GAME.explosionCountingGrid[i][j] = 0;
+        }
+    }
+
+    for (int k = 0; k < player.maxConcurrentBombs; k++) {
+        bombs[k].placed = false;
+        bombs[k].texture = 0;
+        bombs[k].explosion.isExploding = false;
+
+        bombs[k].bombTimer = chrono::steady_clock::now();
+        bombs[k].explosion.explosionTimer = chrono::steady_clock::now();
+    }
+
+    player.totalBombsPlaced = 0;
     player.x = 1;
     player.y = 1;
     player.alive = true;
     enteredPortal = false;
 
     for (int i = 0; i < enemiesAmount; i++) {
-        enemies[i].alive = true;
+        enemies[i].lifes = 1;
         enemies[i].deathAnimation = false;
     }
 
-    mapGeneration(enemiesAmount, enemies, player, mapGrid);
+    mapGeneration(enemiesAmount, enemies, player, mapGrid, boss);
 }
 
 // Função de configurar o console pro jogo no início do código
@@ -520,6 +574,8 @@ int main() {
         player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0;
         score = 0;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
+        currentLevel = 1;
+        enteredPortal = false;
         int enemiesAmount = 5;
 
 
@@ -547,6 +603,7 @@ int main() {
 
         // Inicialização da variável que armazena o timer do movimento dos inimigos.
         auto enemiesMoveTimer = chrono::steady_clock::now();
+        auto bossMoveTimer = chrono::steady_clock::now();
 
         // Inicialização da struct de bombas
         Bomb bombs[5];
@@ -554,23 +611,30 @@ int main() {
         //Inicialização dos inimigos e suas respectivas posições
         Enemy enemies[enemiesAmount];
 
-        mapGeneration(enemiesAmount, enemies, player, mapGrid);
+        //Inicialização do boss
+        Enemy boss;
+
+        mapGeneration(enemiesAmount, enemies, player, mapGrid, boss);
 
         int enemyRandomMoveChance;
         float enemyMovementSpeed;
+        float bossMovementSpeed;
 
         switch (difficulty) {
             case 1:
                 enemyRandomMoveChance = 0;
                 enemyMovementSpeed = 1.5;
+                bossMovementSpeed = 1;
             break;
             case 2:
                 enemyRandomMoveChance = 1;
                 enemyMovementSpeed = 1;
+                bossMovementSpeed = .7;
             break;
             case 3:
                 enemyRandomMoveChance = 3;
                 enemyMovementSpeed = 0.7;
+                bossMovementSpeed = .5;
             break;
 
         }
@@ -579,7 +643,7 @@ int main() {
         char keyPressed;
 
         //Começa o jogo de verdade
-        while(player.alive && currentLevel < 4){
+        while(player.alive && currentLevel < 5){
             while(player.alive && enteredPortal == false){ //Condição de VITÓRIA: Passar pelo portal. Condição de DERROTA: Morrer
 
                 ///Posiciona a escrita no início do console
@@ -647,9 +711,9 @@ int main() {
                     if (!cannotMoveYet) {
                         for(int i=0; i<enemiesAmount; i++){ // Processamento dos 4 inimigos
 
-                            if (enemies[i].alive) {
+                            if (enemies[i].lifes) {
                                 if (mapGrid[enemies[i].y][enemies[i].x] == 4){ // Se está na explosão, ele morre
-                                    enemies[i].death(mapGrid[enemies[i].y][enemies[i].x], player);
+                                    enemies[i].death(mapGrid[enemies[i].y][enemies[i].x], i, player);
                                 }
 
                                 bool hasMoved = false;
@@ -660,13 +724,13 @@ int main() {
 
                                 intelligentMove = ranIntelligentMove(gen);
                                 if(intelligentMove >= enemyRandomMoveChance){
-                                    randomEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
+                                    randomEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player, i);
                                 } else{
-                                    intelligentEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player);
+                                    intelligentEnemyMovement(hasMoved, attempts, enemies[i], mapGrid, player, i);
                                 }
 
 
-                                if (!hasMoved && enemies[i].alive && player.alive) {
+                                if (!hasMoved && enemies[i].lifes && player.alive) {
                                     int startDirection = ranDir(gen);
 
                                     for (int j = 0; j < 4 && !hasMoved && player.alive; j++) {
@@ -674,19 +738,19 @@ int main() {
 
                                         switch (enemies[i].direction) {
                                             case 0: // Cima
-                                                enemies[i].movement(mapGrid, player, hasMoved, 0, -1);
+                                                enemies[i].movement(mapGrid, player, hasMoved, i, 0, -1);
                                                 break;
 
                                         case 1: // Direita
-                                            enemies[i].movement(mapGrid, player, hasMoved, 1);
+                                            enemies[i].movement(mapGrid, player, hasMoved, i, 1);
                                             break;
 
                                         case 2: // Baixo
-                                            enemies[i].movement(mapGrid, player, hasMoved, 0, 1);
+                                            enemies[i].movement(mapGrid, player, hasMoved, i, 0, 1);
                                             break;
 
                                         case 3: // Esquerda
-                                            enemies[i].movement(mapGrid, player, hasMoved, -1);
+                                            enemies[i].movement(mapGrid, player, hasMoved, i, -1);
                                             break;
                                         }
                                     }
@@ -703,14 +767,66 @@ int main() {
                 }
                 // FIM DO MOVIMENTO DOS INIMIGOS
 
+                // MOVIMENTO DO BOSS:
+                if(currentLevel == 4 && boss.lifes){
+                    bool cannotMoveYet = true;
+                    globalTimer(bossMoveTimer, bossMovementSpeed, cannotMoveYet);
+
+                    if (!cannotMoveYet) {
+                        if (boss.lifes) {
+
+                            bool hasMoved = false;
+                            int attempts = 0;
+                            int oldX = boss.x; // Guarda a posição antiga do boss.
+                            int oldY = boss.y;
+                            int i=-1;
+
+                            intelligentEnemyMovement(hasMoved, attempts, boss, mapGrid, player, i);
+
+
+                            if (!hasMoved && boss.lifes && player.alive) {
+                                int startDirection = ranDir(gen);
+
+                                for (int j = 0; j < 4 && !hasMoved && player.alive; j++) {
+                                    boss.direction = (startDirection + j) % 4;
+
+                                    switch (boss.direction) {
+                                    case 0: // Cima
+                                        boss.movement(mapGrid, player, hasMoved, i, 0, -1);
+                                        break;
+
+                                    case 1: // Direita
+                                        boss.movement(mapGrid, player, hasMoved, i, 1);
+                                        break;
+
+                                    case 2: // Baixo
+                                        boss.movement(mapGrid, player, hasMoved, i, 0, 1);
+                                        break;
+
+                                    case 3: // Esquerda
+                                        boss.movement(mapGrid, player, hasMoved, i, -1);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (hasMoved) {
+                                mapGrid[oldY][oldX] = 0;           // Exclui o desenho do boss que estava na posição anterior.
+                                mapGrid[boss.y][boss.x] = 10;       // Desenha o boss na posição nova.
+                            }
+                        }
+                        bossMoveTimer = chrono::steady_clock::now(); // Reinicia o cronômetro
+                    }
+                }
+                // FIM DO MOVIMENTO DO BOSS
 
 
                  // timer da bomba depois de posicionada (ANTES DE EXPLODIR):
-                 for (int k = 0; k < player.maxConcurrentBombs; k++) {
+                for (int k = 0; k < player.maxConcurrentBombs; k++) {
                     if (bombs[k].placed) {
                         bombs[k].texture = globalTimer(bombs[k].bombTimer, 3, bombs[k].placed, true);
                         if (!bombs[k].placed) {
-                            bombs[k].explode(mapGrid, score, player, bombs, enemies, enemiesAmount);
+                            bombs[k].explode(mapGrid, score, player, bombs, enemies, boss, enemiesAmount);
                             cout << "\a"; // Som de EXPLOSAO (beep)
                         }
                     }
@@ -725,14 +841,14 @@ int main() {
 
                         globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
                         if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
-                            bombs[k].bombCross(mapGrid, score, player, bombs, enemies, enemiesAmount, true);
+                            bombs[k].bombCross(mapGrid, score, player, bombs, enemies, boss, enemiesAmount, true);
                             reducePositiveCount(GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x], mapGrid[bombs[k].explosion.y][bombs[k].explosion.x], true);
                         }
                     }
                 }
 
                 for (int i = 0; i < enemiesAmount; i++) {
-                    if (!enemies[i].alive && mapGrid[enemies[i].y][enemies[i].x] == 6) {
+                    if (!enemies[i].lifes && mapGrid[enemies[i].y][enemies[i].x] == 6) {
                         enemies[i].deathAnimation = true;
 
                         globalTimer(enemies[i].deathTimer, 1, enemies[i].deathAnimation);
@@ -743,31 +859,93 @@ int main() {
                     }
                 }
 
-            } //Fim do laço do jogo
-            if(enteredPortal && player.alive){
-                currentLevel++;
+                if (boss.lifes <= 0 && boss.deathAnimation) {
+                    globalTimer(boss.deathTimer, 1, boss.deathAnimation);
 
-                if(currentLevel < 4){
-                    nextLevel (mapGrid, enemiesAmount, player, enemies);
+                    if (!boss.deathAnimation && mapGrid[boss.y][boss.x] == 6) {
+                        mapGrid[boss.y][boss.x] = 0;
+                    }
                 }
+
+            } //Fim do laço do jogo
+
+            if(enteredPortal){
+                bool allEnemiesDead = true;
+
+                for(int i=0; i<enemiesAmount; i++){
+                    if(enemies[i].lifes > 0){
+                        allEnemiesDead = false;
+                    }
+                }
+
+                    if (currentLevel == 4 && boss.lifes > 0) {
+                        allEnemiesDead = false;
+                    }
+
+                    if (allEnemiesDead) {
+                        currentLevel++;
+
+                        if (currentLevel < 5) {
+                            nextLevel(mapGrid, enemiesAmount, player, enemies, boss, bombs);
+                        }
+                    }
+                    else {
+                        enteredPortal = false;
+                    }
             }
         }
+        cout << "\033[2J\033[H";
 
-        ///Mensagem de fim de jogo
-        if(player.alive == false)
-            cout << "       Você morreu..." << endl;
-        else if(score >= enemiesAmount * 250)
-            cout << "       Parabéns! Você matou todos os INIMIGOS! 🏅" << endl;
+        cout << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << "  |               RESULTADO DA PARTIDA             |" << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << "  |                                                |" << endl;
 
+        if (player.alive == false) {
+            cout << "  |                VOCE MORREU!                    |" << endl;
+        }
+        else if (currentLevel == 5) {
+            cout << "  |             PARABENS, VOCE VENCEU!             |" << endl;
+        }
+
+        cout << "  |                                                |" << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << "  |                  SEUS STATUS                  |" << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << "  |                                                |" << endl;
+
+        cout << "  |  Fase alcancada:       "
+             << currentLevel << "                            |" << endl;
+
+        cout << "  |  Pontuacao final:      "
+             << score << "                         |" << endl;
+
+        cout << "  |  Inimigos eliminados:  "
+             << player.enemiesKilled << "                            |" << endl;
+
+        cout << "  |  Paredes quebradas:    "
+             << player.totalWallsBroken << "                            |" << endl;
+
+        cout << "  |  Bombas colocadas:     "
+             << player.bombsPlaced << "                            |" << endl;
+
+        cout << "  |  Movimentos realizados:"
+             << player.totalMovement << "                            |" << endl;
+
+        cout << "  |                                                |" << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << endl;
         cout << "       Aperte ENTER para voltar ao Menu.";
 
-        while(true) {
+        while (true) {
             char enter = _getch();
 
             if (enter == 13) {
                 break;
             }
         }
+
     }
 
 
