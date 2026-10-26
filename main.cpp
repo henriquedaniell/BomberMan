@@ -471,26 +471,26 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
                                 tex = bomb[k].texture;
 	                    }
 						cout << bombColor(tex) << "💣ʔ" << "\033[0m";
-                    break;
+                        break;
                     }
 	                case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break; // Explosão
 	                case 5: cout << "👾 "; break; // Inimigo
 	                case 6: cout << "💀 "; break; // Morte do inimigo
-					        case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com powerup box
+                    case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com powerup box
 	                case 8: cout << "🌀 "; break; // Portal para próxima fase
-					        case 9: {
-					          switch (GAME.powerUpGrid[i][j]) {
-                      case MORE_EXPLOSION_RANGE:
-                          cout << "\033[92m" << "🔥+" << "\033[0m"; break; // powerup
-                          break;
-                      case EXTRA_BOMB:
-								          cout << "\033[92m" << "🧨+" << "\033[0m"; break; // powerup
-                          break;
-							        case EXPLOSION_IMMNUNITY:
-								          cout << "\033[92m" << "🛡️+" << "\033[0m"; break; // powerup
-								          break;
-					          }
-                 }
+                    case 9: {
+					    switch (GAME.powerUpGrid[i][j]) {
+                            case MORE_EXPLOSION_RANGE:
+                                cout << "\033[92m" << "🔥+" << "\033[0m"; break; // powerup
+                            case EXTRA_BOMB:
+                                cout << "\033[92m" << "🧨+" << "\033[0m"; break; // powerup
+                            case EXPLOSION_IMMNUNITY:
+                                cout << "\033[92m" << "🛡️+" << "\033[0m"; break; // powerup
+                            default:
+                                cout << "\033[92m" << "🌟 " << "\033[0m"; break; // powerup
+                        }
+                        break;
+                    }
 	               case 10: cout << "😈 "; break; // Boss
 	               //default: cout<<"-"; //erro
 	            } //Fim switch
@@ -705,7 +705,7 @@ int main() {
 
 		    //Inicialização do boss
         Enemy boss;
-        
+
         PowerUp powerUps[GAME.maxPowerUps];
 
         mapGeneration(enemiesAmount, enemies, player, mapGrid, GAME.powerUpsNumber, powerUps, boss);
