@@ -6,7 +6,16 @@
 #include <chrono>
 #include <thread>
 #include <random>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <algorithm>
+#include <ctime>
+#include <mmsystem.h>
 
+void ranking();
+void career();
 #include "menu.cpp"
 
 using namespace std;
@@ -28,7 +37,6 @@ uniform_int_distribution<> ranPortalY(6, 11); // Sorteador da casa Y que o porta
 PARA FAZER (EDUARDO):
     - adicionar caixas e powerups
     - limpar código criando funções
-    - tentar implementar recursividade
 */
 
 
@@ -36,9 +44,11 @@ PARA FAZER (EDUARDO):
 // ========================================VARIAVEIS GLOBAIS=================================================
 
 int score = 0; // Pontuação do jogo
-int currentLevel = 1; // Controla a fase
+int currentLevel = 4; // Controla a fase
 bool enteredPortal = false; // Confirma se entrou no portal
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
+
+enum PowerUpType {NOT_PLACED, MORE_EXPLOSION_RANGE, EXTRA_BOMB, EXPLOSION_IMMNUNITY, NOCLIP, EXTREME_EXPLOSION};
 
 
 // =================FUNCAO DE DIRECOES================
@@ -86,24 +96,51 @@ void reducePositiveCount(int &count, int &gridPos, bool resetGridValue = false) 
 
 // STRUCT JOGO
 struct GeneralGame {
-	int explosionCountingGrid[13][19] = {0};
+	int 			explosionCountingGrid[13][19] = {0};
+	PowerUpType		powerUpGrid[13][19] = {static_cast<PowerUpType>(0)};
+	int 			maxPowerUps = 15, powerUpsNumber = 0;
 };
 GeneralGame GAME;
 
+
+struct PowerUp {int x, y; PowerUpType type; bool collected = false;};
+
 // STRUCT DE PERSONAGEM JOGADOR
 struct Character {
-    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
+    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0, range = 1, lastPowerUpPicked;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
+    string nick;
+    bool alive = true, immuneToExplosion = false;
 
-    bool alive = true;
-
-    void movement(int gameMap[13][19], bool &enteredPortal, int newX = 0, int newY = 0) {
-        if (gameMap[y + newY][x + newX] == 0) {
+    void movement(int gameMap[13][19], bool &enteredPortal, int &powerUpsNumber, int newX = 0, int newY = 0) {
+        if (gameMap[y + newY][x + newX] == 0 || (gameMap[y + newY][x + newX] == 4 && immuneToExplosion)) {
             x += newX;           // Move o player caso haja caminho livre
             y += newY;
         }
-        else if(gameMap[y + newY][x + newX] == 5 || gameMap[y + newY][x + newX] == 4 || gameMap[y + newY][x + newX] == 10) {
-            alive = false; // Player morre se der de cara com um inimigo, com uma casa de explosão da bomba ou com o boss
+        else if(gameMap[y + newY][x + newX] == 5 || (gameMap[y + newY][x + newX] == 4 && !immuneToExplosion) || gameMap[y + newY][x + newX] == 10) {
+            alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
         }
+		else if (gameMap[y + newY][x + newX] == 9) {
+			x += newX;
+            y += newY;
+			powerUpsNumber--;
+			gameMap[y][x] = 0;
+
+			switch (GAME.powerUpGrid[y][x]) {
+                case MORE_EXPLOSION_RANGE:
+                    if (range < 10)
+                        range++;
+                    break;
+                case EXTRA_BOMB:
+                    if (maxConcurrentBombs < 5)
+                        maxConcurrentBombs++;
+                    break;
+				case EXPLOSION_IMMNUNITY:
+					immuneToExplosion = true;
+					break;
+			}
+
+			GAME.powerUpGrid[y][x] = static_cast<PowerUpType>(0);
+		}
         else if(gameMap[y + newY][x + newX] == 8){
             enteredPortal = true;
 		}
@@ -112,7 +149,7 @@ struct Character {
 
 // STRUCT DOS INIMIGOS
 struct Enemy {
-    int x, y, direction=0, lifes = 1;
+    int x = 9, y = 9, direction=0, lifes = 1;
     bool deathAnimation = false;
     chrono::steady_clock::time_point deathTimer = chrono::steady_clock::now();
 
@@ -152,7 +189,8 @@ struct Enemy {
 		    hasMoved = true;
 		} else if(gameMap[y + newY][x + newX] == 4){ // Se for explosão
 		    if(i>-1){
-                gameMap[y][x] = 0;    // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
+                if (gameMap[y][x] == 5)
+                    gameMap[y][x] = 0;    // Limpa a posição antiga (sem caveira, pois o inimigo nem chegou lá)
                 x += newX;                     // Inimigo anda
                 y += newY;
                 death(gameMap[y][x], i, player);
@@ -169,8 +207,6 @@ struct Enemy {
 		deathTimer = chrono::steady_clock::now();
 		score += 250;
 		gridPos = 6;
-		if (GAME.explosionCountingGrid[y][x] > 0)
-            GAME.explosionCountingGrid[y][x]--;
 		player.enemiesKilled += 1;
 	}
 
@@ -184,9 +220,6 @@ struct Enemy {
             deathAnimation = true;
             score += 250;
             gridPos = 6;
-
-            if (GAME.explosionCountingGrid[y][x] > 0)
-                GAME.explosionCountingGrid[y][x]--;
 		}
 	}
 };
@@ -202,7 +235,11 @@ struct Bomb {
 
 
 	struct Explosion {
-		int x, y, range = 5;
+		int x, y, range = 1;
+
+		// (só grava nas casas que implementa:)
+		int reachedRange[4] = {0}; // Distância que a explosão de fato realmente chegou nas 4 (QUATRO) direções
+
 		bool isExploding = false; // Variavel para o timer da explosao
 
 		// Inicialização variavel que armazena o timer da explosao
@@ -211,66 +248,65 @@ struct Bomb {
 
 	Explosion explosion;
 
-
-	// Função da área de explosão da bomba
-	void bombCross(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], Enemy &boss, int enemiesAmount, bool clearExplosion = false){
-		for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
+    // Função da área de explosão da bomba
+    void bombCross(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], Enemy &boss, int enemiesAmount) {
+        for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
 			bool hitWall = false;
 			int explosionRange = explosion.range;
+			explosion.reachedRange[dir] = 0;
 			Explosion origin = explosion;
 
 			for (int range = 1; range <= explosionRange; range++) {
                 int newX = origin.x, newY = origin.y;
 				int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y, true, &newX, &newY);
 				switch (gridPos) {
-				    case 1:
+				    case 1: case 8:
 						hitWall = true;
 						break;
 					case 2:
-						if (!clearExplosion) {
-                            GAME.explosionCountingGrid[newY][newX] = 1;
-							gridPos = 4;
-                            player.totalWallsBroken++;
-						}
+                        GAME.explosionCountingGrid[newY][newX]++;
+                        gridPos = 4;
+                        player.totalWallsBroken++;
+                        explosion.reachedRange[dir] = range;
 						hitWall = true;
                         score += 10;
 						break;
                     case 3:
-                        if (!clearExplosion) {
-                            for (int k = 0; k < player.maxConcurrentBombs; k++) {
-                                if (bombs[k].x == newX && bombs[k].y == newY && bombs[k].placed) {
-                                    bombs[k].placed = false;
-                                    bombs[k].explode(gameMap, score, player, bombs, enemies, boss, enemiesAmount);
-									GAME.explosionCountingGrid[newY][newX]++;
-                                    break;
-                                }
+                        for (int k = 0; k < player.maxConcurrentBombs; k++) {
+                            if (bombs[k].x == newX && bombs[k].y == newY && bombs[k].placed) {
+                                bombs[k].placed = false;
+                                bombs[k].explode(gameMap, score, player, bombs, enemies, boss, enemiesAmount);
+                                GAME.explosionCountingGrid[newY][newX]++;
+                                break;
                             }
-                            hitWall = true;
                         }
+                        hitWall = true;
+                        explosion.reachedRange[dir] = range;
                         break;
-					case 4:
-						if (clearExplosion) {
-							reducePositiveCount(GAME.explosionCountingGrid[newY][newX], gridPos, true);
-						} else {
-                            GAME.explosionCountingGrid[newY][newX]++;
-						}
+					case 4: case 6:
+                        GAME.explosionCountingGrid[newY][newX]++;
+                        explosion.reachedRange[dir] = range;
 						break;
-					case 0: case 5:
-						if (!clearExplosion) {
-                            GAME.explosionCountingGrid[newY][newX] = 1;
-							gridPos = 4;
-						}
-						break;
-                    case 6: case 8:
-                        if (clearExplosion) {
-							reducePositiveCount(GAME.explosionCountingGrid[newY][newX], gridPos);
-                        } else {
-                            GAME.explosionCountingGrid[newY][newX]++;
+					case 0: case 5: case 9:
+                        if (gridPos == 9) {
+                            GAME.powerUpsNumber--;
+                            GAME.powerUpGrid[newY][newX] = static_cast<PowerUpType>(0);
                         }
-                        break;
+                        GAME.explosionCountingGrid[newY][newX]++;
+                        gridPos = 4;
+                        explosion.reachedRange[dir] = range;
+						break;
+					case 7:
+                        gridPos = 9;
+                        player.totalWallsBroken++;
+                        GAME.explosionCountingGrid[newY][newX]++;
+						hitWall = true;
+						explosion.reachedRange[dir] = range;
+                        score += 10;
+						break;
                     case 10:
-                        if (!clearExplosion && boss.lifes > 0) {
-                                boss.damage(gridPos);
+                        if (boss.lifes > 0) {
+                            boss.damage(gridPos);
                         }
                         hitWall = true;
                         break;
@@ -278,6 +314,28 @@ struct Bomb {
 
 				if (hitWall)
 					break;
+			}
+		}
+    }
+
+
+	// Função para limpar a área de explosão da bomba
+	void clearBombCross(int (&gameMap)[13][19]){
+		for (int dir = 0; dir < 4; dir++) {		// testa todas as 4 direções para explosão
+			int explosionRange = explosion.reachedRange[dir];
+			Explosion origin = explosion;
+
+			for (int range = 0; range <= explosionRange; range++) {
+                int newX = origin.x, newY = origin.y;
+				int &gridPos = fourDirectionsValueReturner(dir, range, gameMap, origin.x, origin.y, true, &newX, &newY);
+				switch (gridPos) {
+					case 4:
+                        reducePositiveCount(GAME.explosionCountingGrid[newY][newX], gridPos, true);
+						break;
+                    default:
+                        reducePositiveCount(GAME.explosionCountingGrid[newY][newX], gridPos);
+                        break;
+				}
 			}
 		}
 
@@ -302,11 +360,191 @@ struct Bomb {
 		if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
 	}
 };
+
+struct Ranking {
+    string nick;
+    string dataHour;
+    int totalScore;
+    int levelReached;
+    int totalKills;
+    int totalWallsBreaked;
+    int totalBombsPlaces;
+    int totalMoves;
+};
 // ========================================FIM DAS STRUCTS===============================================
 
 
 
 // ========================================INICIO DAS FUNÇÕES===============================================
+
+void playMusic(){
+    PlaySound(TEXT("bombermanMusica.wav"), NULL,
+              SND_FILENAME | SND_ASYNC | SND_LOOP);
+}
+
+ // Retorna a data e a hora atuais
+string dataHourNow() {
+    time_t now = time(nullptr);
+    tm* dataNow = localtime(&now);
+
+    char buffer[20];
+    strftime(buffer, sizeof(buffer), "%d-%m-%Y %H:%M:%S", dataNow);
+
+    return string(buffer);
+}
+
+// Carrega todos os saves do arquivo organizado por data
+vector<Ranking> loadSaves(const string& fileName = "saves_data.txt") {
+    vector<Ranking> saves;
+    ifstream file(fileName);
+
+    string row;
+
+    while (getline(file, row)) {
+        stringstream ss(row);
+        string field;
+        Ranking save;
+
+        try {
+            getline(ss, save.dataHour, ';');
+            getline(ss, save.nick, ';');
+
+            getline(ss, field, ';');
+            save.totalScore = stoi(field);
+
+            getline(ss, field, ';');
+            save.levelReached = stoi(field);
+
+            getline(ss, field, ';');
+            save.totalKills = stoi(field);
+
+            getline(ss, field, ';');
+            save.totalWallsBreaked = stoi(field);
+
+            getline(ss, field, ';');
+            save.totalBombsPlaces = stoi(field);
+
+            getline(ss, field, ';');
+            save.totalMoves = stoi(field);
+
+            saves.push_back(save);
+        }
+        catch (...) {
+            // Ignora uma linha que esteja incompleta ou inválida
+        }
+    }
+
+    file.close();
+    return saves;
+}
+
+// Escreve todos os saves no arquivo informado
+void typeSaves(const string& fileName, const vector<Ranking>& saves) {
+    ofstream file(fileName);
+
+    for (const Ranking& save : saves) {
+        file << save.dataHour << ';'
+             << save.nick << ';'
+             << save.totalScore << ';'
+             << save.levelReached << ';'
+             << save.totalKills << ';'
+             << save.totalWallsBreaked << ';'
+             << save.totalBombsPlaces << ';'
+             << save.totalMoves << '\n';
+    }
+
+    file.close();
+}
+
+// Registra uma partida nos dois arquivos
+void registerSave(Ranking newSave) {
+    vector<Ranking> savesData = loadSaves();
+
+    // Adiciona a nova partida sem apagar as anteriores
+    savesData.push_back(newSave);
+
+    // Ordena da partida mais recente para a mais antiga
+    sort(savesData.begin(), savesData.end(),
+         [](const Ranking& a, const Ranking& b) {
+             return a.dataHour > b.dataHour;
+         });
+
+    typeSaves("saves_data.txt", savesData);
+
+    // Cria uma cópia para ordenar pela pontuação
+    vector<Ranking> savesScore = savesData;
+
+    sort(savesScore.begin(), savesScore.end(),
+         [](const Ranking& a, const Ranking& b) {
+             if (a.totalScore != b.totalScore) {
+                 return a.totalScore > b.totalScore;
+             }
+
+             // Em caso de empate, a partida mais recente vem primeiro
+             return a.dataHour > b.dataHour;
+         });
+
+    typeSaves("saves_score.txt", savesScore);
+}
+
+void ranking() {
+    vector<Ranking> saves = loadSaves("saves_score.txt");
+
+    system("cls");
+
+    cout << "\n========== RANKING ==========\n\n";
+
+    if (saves.empty()) {
+        cout << "Nenhuma partida registrada.\n";
+    } else {
+        for (size_t i = 0; i < saves.size(); i++) {
+            cout << i + 1 << " - " << saves[i].nick
+                 << " | Pontuacao: " << saves[i].totalScore
+                 << " | Fase: " << saves[i].levelReached
+                 << " | Inimigos eliminados: " << saves[i].totalKills
+                 << "\n";
+        }
+    }
+
+    cout << "\nPressione ENTER para voltar ao menu.";
+
+    while (_getch() != 13) {
+    }
+}
+
+void career() {
+    vector<Ranking> saves = loadSaves();
+
+    system("cls");
+
+    cout << "\n========== CARREIRA ==========\n\n";
+
+    if (saves.empty()) {
+        cout << "Nenhuma partida registrada.\n";
+    } else {
+        for (size_t i = 0; i < saves.size(); i++) {
+            cout << "Partida " << i + 1
+                 << " - " << saves[i].nick << "\n";
+
+            cout << "Data: " << saves[i].dataHour << "\n";
+            cout << "Pontuacao: " << saves[i].totalScore << "\n";
+            cout << "Fase alcancada: " << saves[i].levelReached << "\n";
+            cout << "Inimigos eliminados: " << saves[i].totalKills << "\n";
+            cout << "Paredes destruidas: "
+                 << saves[i].totalWallsBreaked << "\n";
+            cout << "Bombas colocadas: "
+                 << saves[i].totalBombsPlaces << "\n";
+            cout << "Movimentos: " << saves[i].totalMoves << "\n";
+
+            cout << "------------------------------\n";
+        }
+    }
+
+    cout << "\nPressione ENTER para voltar ao menu.";
+
+    while (_getch() != 13) {
+    }
+}
 
 // Criação do Boss
 void spawnBoss(Enemy &boss, int (&mapGrid)[13][19]){
@@ -329,23 +567,39 @@ string bombColor(int secondsRemaining) {
     return "\033[0m";
 }
 
-///Sorteio das paredes que serão destrutíveis
-void wallsGeneration(int (&gameMap)[13][19]) {
+
+// FUNÇÕES PARA GERAÇÃO INICIAL DO MAPA ANTES DE CADA FASE
+// Sorteio das paredes que serão destrutíveis
+void wallsGeneration(int (&gameMap)[13][19], int &powerUpsNumber, PowerUp (&powerUps)[]) {
 	int randomWallGen = 0;
 	for(int i=0; i<13; i++){
 		for(int j=0; j<19; j++){
 			if(gameMap[i][j]==9){
 				randomWallGen = distrib(gen);
-				if(randomWallGen>35){
-					gameMap[i][j] = 0;
-				} else {
+				if (randomWallGen <= 35){
 					gameMap[i][j] = 2;
+				} else if (randomWallGen <= 50 && powerUpsNumber < GAME.maxPowerUps) {
+					gameMap[i][j] = 7;
+					powerUps[powerUpsNumber].x = j;
+					powerUps[powerUpsNumber].y = i;
+
+					uniform_int_distribution<> randomPowerUpType(1, 3);
+					int randIndex = randomPowerUpType(gen);
+					PowerUpType powerUpType = static_cast<PowerUpType>(randIndex);
+
+					powerUps[powerUpsNumber].type = powerUpType;
+					GAME.powerUpGrid[i][j] = powerUpType;
+
+					powerUpsNumber++;
+				} else {
+					gameMap[i][j] = 0;
 				}
 			}
 		}
 	}
 }
 
+// Geração do portal de passagem de fase
 void portalGeneration(int (&gameMap)[13][19]) {
     int randomPortalX = 0;
     int randomPortalY = 0;
@@ -356,19 +610,20 @@ void portalGeneration(int (&gameMap)[13][19]) {
     gameMap[randomPortalY][randomPortalX] = 8;
 }
 
-void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], Enemy &boss) {
+void mapGeneration(int enemiesAmount, Enemy enemies[], Character player, int (&gameMap)[13][19], int &powerUpsNumber, PowerUp (&powerUps)[], Enemy &boss) {
+	if(currentLevel == 4)
+        spawnBoss(boss, gameMap);
 
 	for(int i=0; i<enemiesAmount; i++){
 	    enemies[i].spawn(player, gameMap);
 	}
 
-	wallsGeneration(gameMap);
+	wallsGeneration(gameMap, powerUpsNumber, powerUps);
 	portalGeneration(gameMap);
-
-    if(currentLevel == 4)
-        spawnBoss(boss, gameMap);
-
 }
+// FIM DAS FUNÇÕES PARA GERAÇÃO INICIAL DO MAPA ANTES DE CADA FASE
+
+
 
 // Função de timer global
 int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDuration, bool &timerTrigger, bool needTexture = false) {
@@ -383,23 +638,29 @@ int globalTimer(std::chrono::steady_clock::time_point startTime, float timerDura
 	    timerTrigger = false;
 	}
 
-	if (needTexture)
+	if (needTexture) {
         return timerDuration - elapsedTime + 1;
-    else
+	} else {
         return 0;
+    }
 }
 
-void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
+
+// FUNÇÃO DE DESENHAR O MAPA
+void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
 	///Imprime o jogo: mapa, personagem e inimigos.
 	for(int i=0;i<13;i++){
 	    for(int j=0;j<19;j++){
 	        if(i==player.y && j==player.x){
-	            cout<< "🤠 "; //Personagem
+                if (player.immuneToExplosion)
+                    cout<< "😇 "; //Personagem
+                else
+                    cout<< "🤠 "; //Personagem
 	        } else {
 	            switch (gameMap[i][j]){
 	                case 0: cout<<"   "; break; //Caminho
 	                case 1: cout << "\033[90m" << "███" << "\033[0m"; break; // Parede INDESTRUTÍVEL
-	                case 2: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break; // Parede DESTRUTÍVEL
+	                case 2: case 7: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break; // Parede DESTRUTÍVEL OU Parede com POWERUP BOX
 	                case 3: {
 						int tex = 0;
 	                    for (int k = 0; k < player.maxConcurrentBombs; k++) {
@@ -407,21 +668,40 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[]){
                                 tex = bomb[k].texture;
 	                    }
 						cout << bombColor(tex) << "💣ʔ" << "\033[0m";
-                    break;
+                        break;
                     }
 	                case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break; // Explosão
 	                case 5: cout << "👾 "; break; // Inimigo
 	                case 6: cout << "💀 "; break; // Morte do inimigo
-					case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com power
+                    // case 7: cout << "\033[33m" << "▓*▓" << "\033[0m"; break; // parede com powerup box
 	                case 8: cout << "🌀 "; break; // Portal para próxima fase
-	                case 10: cout << "😈 "; break; // Boss
-	                //default: cout<<"-"; //erro
+                    case 9: {
+					    switch (GAME.powerUpGrid[i][j]) {
+                            case MORE_EXPLOSION_RANGE:
+                                cout << "\033[92m" << "🔥+" << "\033[0m"; break; // powerup
+                            case EXTRA_BOMB:
+                                cout << "\033[92m" << "🧨+" << "\033[0m"; break; // powerup
+                            case EXPLOSION_IMMNUNITY:
+                                cout << "\033[92m" << "🛡️+" << "\033[0m"; break; // powerup
+                            default:
+                                cout << "\033[92m" << "🌟 " << "\033[0m"; break; // powerup
+                        }
+                        break;
+                    }
+	               case 10: cout << "😈 "; break; // Boss
+	               //default: cout<<"-"; //erro
 	            } //Fim switch
 	        }
 	    }
 	    cout << "\033[K\n";
 	} //Fim for mapa
+
+	cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A\033[K" << endl;
+	cout << "                   Colocar Bomba - F\033[K" << endl;
+	cout << "                   PONTOS: " << score << "\033[K" << endl;
 }
+// FIM DA FUNÇÃO DE DESENHAR O MAPA
+
 
 void randomEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int (&mapGrid)[13][19], Character &player, int i){
     while(!hasMoved && attempts < 10 && enemies.lifes && player.alive){ // Se ainda não se mexeu, não tentou se mexer 10 vezes e ainda está vivo...
@@ -462,8 +742,12 @@ void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int
         attempts++;
     }
 }
+// FIM DAS FUNÇÕES DE MOVIMENTOS DOS INIMIGOS
 
-void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], Enemy &boss, Bomb bombs[]){
+
+
+// FUNÇÃO DE PASSAR PARA A PROX FASE
+void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], int &powerUpsNumber, PowerUp (&powerUps)[], Enemy &boss, Bomb bombs[]){
     int newMap[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
                         1,0,0,2,9,9,9,2,9,9,9,2,9,9,9,9,9,9,1,
                         1,0,1,9,1,2,1,9,1,9,1,9,1,9,1,9,1,9,1,
@@ -510,8 +794,11 @@ void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, En
         enemies[i].deathAnimation = false;
     }
 
-    mapGeneration(enemiesAmount, enemies, player, mapGrid, boss);
+    mapGeneration(enemiesAmount, enemies, player, mapGrid, powerUpsNumber, powerUps, boss);
 }
+// FIM DA FUNÇÃO DE PASSAR PARA A PROX FASE
+
+
 
 // Função de configurar o console pro jogo no início do código
 void configurarConsole(COORD &coord) {
@@ -542,6 +829,23 @@ void configurarConsole(COORD &coord) {
     ///FIM DO TRECHO
 }
 
+void drawBossBar(Enemy &boss) {
+    cout << endl;
+    cout << "\033[91m";
+    cout << "       ========================================\n";
+    cout << "                      O Professor\n";
+    cout << "       ========================================\n";
+    cout << "\033[0m";
+    cout << "                     [";
+
+    for (int i = 0; i < 3; i++) {
+        if (i < boss.lifes)
+            cout << "\033[91m ❤️ \033[0m";
+        else
+            cout << "\033[90m -- \033[0m";
+    }
+    cout << "]";
+}
 
 // ========================================FIM DAS FUNÇÕES=================================================
 
@@ -550,6 +854,8 @@ void configurarConsole(COORD &coord) {
 
 
 int main() {
+
+    playMusic();
 
 	COORD coord;
     configurarConsole(coord);
@@ -567,17 +873,44 @@ int main() {
     system("mode con: cols=70 lines=30");
 
 	// Inicialização da struct Character (player)
-    Character player{.maxConcurrentBombs = 1};
+    Character player;
 
     while(menu(alreadyPlayed)){
         cout << "\033[2J\033[H";
-        player.x = 1, player.y = 1, player.alive = true, player.totalBombsPlaced = 0;
+		player = {.x = 1, .y = 1, .maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .alive = true, .immuneToExplosion = false};
         score = 0;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
-        currentLevel = 1;
+        currentLevel = 4;
         enteredPortal = false;
-        int enemiesAmount = 5;
+        int enemiesAmount;
+		GAME.powerUpsNumber = 0;
 
+
+        int enemyRandomMoveChance;
+        float enemyMovementSpeed;
+        float bossMovementSpeed;
+
+        switch (difficulty) {
+            case 1:
+                enemyRandomMoveChance = 0;
+                enemyMovementSpeed = 1.5;
+                bossMovementSpeed = 1;
+                enemiesAmount = 3;
+            break;
+            case 2:
+                enemyRandomMoveChance = 1;
+                enemyMovementSpeed = 1;
+                bossMovementSpeed = .7;
+                enemiesAmount = 5;
+            break;
+            case 3:
+                enemyRandomMoveChance = 3;
+                enemyMovementSpeed = 0.7;
+                bossMovementSpeed = .5;
+                enemiesAmount = 7;
+            break;
+
+        }
 
         for (int i = 0; i < 13; i++) {
             for (int j = 0; j < 19; j++) {
@@ -611,51 +944,36 @@ int main() {
         //Inicialização dos inimigos e suas respectivas posições
         Enemy enemies[enemiesAmount];
 
-        //Inicialização do boss
+		    //Inicialização do boss
         Enemy boss;
 
-        mapGeneration(enemiesAmount, enemies, player, mapGrid, boss);
+        PowerUp powerUps[GAME.maxPowerUps];
 
-        int enemyRandomMoveChance;
-        float enemyMovementSpeed;
-        float bossMovementSpeed;
-
-        switch (difficulty) {
-            case 1:
-                enemyRandomMoveChance = 0;
-                enemyMovementSpeed = 1.5;
-                bossMovementSpeed = 1;
-            break;
-            case 2:
-                enemyRandomMoveChance = 1;
-                enemyMovementSpeed = 1;
-                bossMovementSpeed = .7;
-            break;
-            case 3:
-                enemyRandomMoveChance = 3;
-                enemyMovementSpeed = 0.7;
-                bossMovementSpeed = .5;
-            break;
-
-        }
+        mapGeneration(enemiesAmount, enemies, player, mapGrid, GAME.powerUpsNumber, powerUps, boss);
 
         //Variavel para tecla pressionada
         char keyPressed;
 
+        player = {.maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .immuneToExplosion = false};
+
+
         //Começa o jogo de verdade
         while(player.alive && currentLevel < 5){
+
             while(player.alive && enteredPortal == false){ //Condição de VITÓRIA: Passar pelo portal. Condição de DERROTA: Morrer
 
                 ///Posiciona a escrita no início do console
                 SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 
                 // Imprime o jogo: mapa, personagem e inimigos.
-                drawMap(mapGrid, player, bombs);
+                drawMap(mapGrid, player, bombs, score);
 
+                cout << "                   Powerups: " << GAME.powerUpsNumber << "\033[K" << endl;
 
-                cout << "    Cima ⬆/W | Direita ➡ /D | Baixo ⬇/S | Esquerda ⬅/A\033[K" << endl;
-                cout << "                   Colocar Bomba - F\033[K" << endl;
-                cout << "                   PONTOS: " << score << "\033[K" << endl;
+                if (currentLevel == 4 && boss.lifes > 0) {
+                    drawBossBar(boss);
+                }
+
 
                 ///Executa os movimentos
                 if ( _kbhit() ){
@@ -663,19 +981,19 @@ int main() {
                     switch(keyPressed)
                     {
                         case 72: case 'w': /// Cima
-                            player.movement(mapGrid, enteredPortal, 0, -1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, 0, -1);
                             player.totalMovement +=1;
                         break;
                         case 80: case 's': /// Baixo
-                            player.movement(mapGrid, enteredPortal, 0, 1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, 0, 1);
                             player.totalMovement +=1;
                         break;
                         case 75:case 'a': /// Esquerda
-                            player.movement(mapGrid, enteredPortal, -1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, -1);
                             player.totalMovement +=1;
                         break;
                         case 77: case 'd': /// Direita
-                            player.movement(mapGrid, enteredPortal, 1);
+                            player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, 1);
                             player.totalMovement +=1;
                         break;
                         case 13: case 32: case 'f':
@@ -688,6 +1006,7 @@ int main() {
                                         bombs[k].x = player.x;
                                         bombs[k].y = player.y;
                                         bombs[k].placed = true;
+                                        bombs[k].explosion.range = player.range;
                                         bombs[k].bombTimer = chrono::steady_clock::now(); // Define o tempo em que a bomba foi posicionada
                                         break;
                                     }
@@ -836,17 +1155,24 @@ int main() {
                 // timer da explosão da bomba (DURANTE A EXPLOSÃO)
                 for (int k = 0; k < player.maxConcurrentBombs; k++) {
                     if (bombs[k].explosion.isExploding) { //Duração da explosão
-                        if (mapGrid[player.y][player.x] == 4) // Mata o jogador se ele andar enquanto a explosão está ativa
+                        if (mapGrid[player.y][player.x] == 4 && !player.immuneToExplosion) // Mata o jogador se ele andar enquanto a explosão está ativa
                             player.alive = false;
 
                         globalTimer(bombs[k].explosion.explosionTimer, 1, bombs[k].explosion.isExploding);
                         if (!bombs[k].explosion.isExploding) { // acabou a explosão DESTA bomba
-                            bombs[k].bombCross(mapGrid, score, player, bombs, enemies, boss, enemiesAmount, true);
-                            reducePositiveCount(GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x], mapGrid[bombs[k].explosion.y][bombs[k].explosion.x], true);
+                            bombs[k].clearBombCross(mapGrid);
+                            if (mapGrid[bombs[k].explosion.y][bombs[k].explosion.x] != 3) {
+                                reducePositiveCount(GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x], mapGrid[bombs[k].explosion.y][bombs[k].explosion.x], true);
+                            } else {
+                                int tempVar = 0;
+                                reducePositiveCount(GAME.explosionCountingGrid[bombs[k].explosion.y][bombs[k].explosion.x], tempVar);
+                            }
                         }
                     }
                 }
 
+
+                // timer da caveira dos inimigos
                 for (int i = 0; i < enemiesAmount; i++) {
                     if (!enemies[i].lifes && mapGrid[enemies[i].y][enemies[i].x] == 6) {
                         enemies[i].deathAnimation = true;
@@ -854,16 +1180,23 @@ int main() {
                         globalTimer(enemies[i].deathTimer, 1, enemies[i].deathAnimation);
 
                         if (!enemies[i].deathAnimation) {
-                            mapGrid[enemies[i].y][enemies[i].x] = 0;
+                            if (GAME.explosionCountingGrid[enemies[i].y][enemies[i].x] > 0)
+                                mapGrid[enemies[i].y][enemies[i].x] = 4;
+                            else
+                                mapGrid[enemies[i].y][enemies[i].x] = 0;
                         }
                     }
                 }
 
+                // timer da caveira do boss
                 if (boss.lifes <= 0 && boss.deathAnimation) {
                     globalTimer(boss.deathTimer, 1, boss.deathAnimation);
 
                     if (!boss.deathAnimation && mapGrid[boss.y][boss.x] == 6) {
-                        mapGrid[boss.y][boss.x] = 0;
+                        if (GAME.explosionCountingGrid[boss.y][boss.x] > 0)
+                            mapGrid[boss.y][boss.x] = 4;
+                        else
+                            mapGrid[boss.y][boss.x] = 0;
                     }
                 }
 
@@ -886,7 +1219,8 @@ int main() {
                         currentLevel++;
 
                         if (currentLevel < 5) {
-                            nextLevel(mapGrid, enemiesAmount, player, enemies, boss, bombs);
+                            GAME.powerUpsNumber = 0;
+                            nextLevel(mapGrid, enemiesAmount, player, enemies, GAME.powerUpsNumber, powerUps, boss, bombs);
                         }
                     }
                     else {
@@ -894,6 +1228,12 @@ int main() {
                     }
             }
         }
+
+        if(player.totalMovement % 2 == 0)
+            score -= player.totalMovement / 2;
+        else
+            score -= (player.totalMovement - 1) / 2;
+
         cout << "\033[2J\033[H";
 
         cout << endl;
@@ -911,32 +1251,46 @@ int main() {
 
         cout << "  |                                                |" << endl;
         cout << "  +------------------------------------------------+" << endl;
-        cout << "  |                  SEUS STATUS                  |" << endl;
-        cout << "  +------------------------------------------------+" << endl;
-        cout << "  |                                                |" << endl;
-
-        cout << "  |  Fase alcancada:       "
-             << currentLevel << "                            |" << endl;
-
-        cout << "  |  Pontuacao final:      "
-             << score << "                         |" << endl;
-
-        cout << "  |  Inimigos eliminados:  "
-             << player.enemiesKilled << "                            |" << endl;
-
-        cout << "  |  Paredes quebradas:    "
-             << player.totalWallsBroken << "                            |" << endl;
-
-        cout << "  |  Bombas colocadas:     "
-             << player.bombsPlaced << "                            |" << endl;
-
-        cout << "  |  Movimentos realizados:"
-             << player.totalMovement << "                            |" << endl;
-
-        cout << "  |                                                |" << endl;
+        cout << "  |                  SEUS STATUS                   |" << endl;
         cout << "  +------------------------------------------------+" << endl;
         cout << endl;
-        cout << "       Aperte ENTER para voltar ao Menu.";
+
+        cout << "    Fase alcancada:            "
+             << currentLevel << "                            " << endl;
+
+        cout << "    Pontuacao final:           "
+             << score << "                         |" << endl;
+
+        cout << "    Inimigos eliminados:       "
+             << player.enemiesKilled << "                            " << endl;
+
+        cout << "    Paredes quebradas:         "
+             << player.totalWallsBroken << "                            " << endl;
+
+        cout << "    Bombas colocadas:          "
+             << player.bombsPlaced << "                            " << endl;
+
+        cout << "    Movimentos realizados:     "
+             << player.totalMovement << "                            " << endl;
+
+        cout << "                                                  " << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << endl;
+        cout << "       Digite seu apelido para salvar no ranking." << endl;
+        cout<<  "             .. ";
+        getline(cin >> ws, player.nick);
+
+        Ranking save;
+        save.dataHour = dataHourNow();
+        save.levelReached = currentLevel;
+        save.nick = player.nick;
+        save.totalBombsPlaces = player.totalBombsPlaced;
+        save.totalKills = player.enemiesKilled;
+        save.totalMoves = player.totalMovement;
+        save.totalWallsBreaked = player.totalWallsBroken;
+        save.totalScore = score;
+
+        registerSave(save);
 
         while (true) {
             char enter = _getch();
