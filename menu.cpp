@@ -9,10 +9,6 @@ using namespace std;
 string difficultyString = "Facil";
 int difficulty = 1;
 
-// ========================================
-// FUNCAO: INSTRUCOES
-// ========================================
-
 void instructions() {
     system("cls");
 
@@ -38,6 +34,12 @@ void instructions() {
     cout << "  |  Inimigos: encostar neles causa derrota        |" << endl;
     cout << "  |  Bombas: cuidado com o alcance da explosao     |" << endl;
     cout << "  |  Portal: permite tentar avancar de fase        |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  POWER-UPS                                     |" << endl;
+    cout << "  |  🔥+ Aumenta o alcance da explosao             |" << endl;
+    cout << "  |  🧨+ Permite colocar mais bombas ao mesmo tempo|" << endl;
+    cout << "  |  🛡️+ Permite andar sobre explosoes sem morrer  |" << endl;
+    cout << "  |                                                |" << endl;
     cout << "  |                                                |" << endl;
     cout << "  |  IMPORTANTE                                    |" << endl;
     cout << "  |  Elimine todos os inimigos antes de usar       |" << endl;
@@ -198,8 +200,10 @@ bool menu(bool &alreadyPlayed) {
 
         cout << "            |" << endl;
         cout << "  |  3 - Instrucoes                        |" << endl;
-        cout << "  |  4 - Creditos                          |" << endl;
-        cout << "  |  5 - Sair                              |" << endl;
+        cout << "  |  4 - Ranking                           |" << endl;
+        cout << "  |  5 - Carreira                          |" << endl;
+        cout << "  |  6 - Creditos                          |" << endl;
+        cout << "  |  7 - Sair                              |" << endl;
         cout << "  |                                        |" << endl;
         cout << "  +----------------------------------------+" << endl;
         cout << endl;
@@ -226,10 +230,18 @@ bool menu(bool &alreadyPlayed) {
                 break;
 
             case 4:
-                credits();
+                ranking();
                 break;
 
             case 5:
+                career();
+                break;
+
+            case 6:
+                credits();
+                break;
+
+            case 7:
                 return false;
 
             default:
