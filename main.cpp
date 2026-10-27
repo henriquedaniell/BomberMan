@@ -1292,14 +1292,6 @@ int main() {
 
         registerSave(save);
 
-        while (true) {
-            char enter = _getch();
-
-            if (enter == 13) {
-                break;
-            }
-        }
-
     }
 
 
