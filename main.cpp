@@ -967,7 +967,7 @@ int main() {
                 // Imprime o jogo: mapa, personagem e inimigos.
                 drawMap(mapGrid, player, bombs, score);
 
-                if (currentLevel == 4 && boss.lifes > 0) {
+                if (currentLevel == 4) {
                     drawBossBar(boss);
                 }
 
