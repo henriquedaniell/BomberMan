@@ -1,4 +1,5 @@
 /// BomberMan (Alunos: Henrique Daniel e Eduardo Ramos
+/// Project --> Build options --> Linker settings --> "-lwinmm" --> Ok
 
 #include <iostream>
 #include <windows.h>
@@ -744,8 +745,6 @@ void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int
 }
 // FIM DAS FUNÇÕES DE MOVIMENTOS DOS INIMIGOS
 
-
-
 // FUNÇÃO DE PASSAR PARA A PROX FASE
 void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], int &powerUpsNumber, PowerUp (&powerUps)[], Enemy &boss, Bomb bombs[]){
     int newMap[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -883,7 +882,7 @@ int main() {
         currentLevel = 4;
         enteredPortal = false;
         int enemiesAmount;
-		GAME.powerUpsNumber = 0;
+		    GAME.powerUpsNumber = 0;
 
 
         int enemyRandomMoveChance;
@@ -968,12 +967,11 @@ int main() {
                 // Imprime o jogo: mapa, personagem e inimigos.
                 drawMap(mapGrid, player, bombs, score);
 
-                cout << "                   Powerups: " << GAME.powerUpsNumber << "\033[K" << endl;
-
                 if (currentLevel == 4 && boss.lifes > 0) {
                     drawBossBar(boss);
                 }
 
+                cout << "                   Powerups: " << GAME.powerUpsNumber << "\033[K" << endl;
 
                 ///Executa os movimentos
                 if ( _kbhit() ){
