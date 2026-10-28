@@ -1,4 +1,5 @@
 /// BomberMan (Alunos: Henrique Daniel e Eduardo Ramos
+/// Project --> Build options --> Linker settings --> "-lwinmm" --> Ok
 
 #include <iostream>
 #include <windows.h>
@@ -6,7 +7,16 @@
 #include <chrono>
 #include <thread>
 #include <random>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <algorithm>
+#include <ctime>
+#include <mmsystem.h>
 
+void ranking();
+void career();
 #include "menu.cpp"
 
 using namespace std;
@@ -35,7 +45,7 @@ PARA FAZER (EDUARDO):
 // ========================================VARIAVEIS GLOBAIS=================================================
 
 int score = 0; // Pontuação do jogo
-int currentLevel = 1; // Controla a fase
+int currentLevel = 4; // Controla a fase
 bool enteredPortal = false; // Confirma se entrou no portal
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 
@@ -99,7 +109,7 @@ struct PowerUp {int x, y; PowerUpType type; bool collected = false;};
 // STRUCT DE PERSONAGEM JOGADOR
 struct Character {
     int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0, range = 1, lastPowerUpPicked;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
-
+    string nick;
     bool alive = true, immuneToExplosion = false;
 
     void movement(int gameMap[13][19], bool &enteredPortal, int &powerUpsNumber, int newX = 0, int newY = 0) {
@@ -351,11 +361,191 @@ struct Bomb {
 		if (player.totalBombsPlaced > 0) {player.totalBombsPlaced--;}
 	}
 };
+
+struct Ranking {
+    string nick;
+    string dataHour;
+    int totalScore;
+    int levelReached;
+    int totalKills;
+    int totalWallsBreaked;
+    int totalBombsPlaces;
+    int totalMoves;
+};
 // ========================================FIM DAS STRUCTS===============================================
 
 
 
 // ========================================INICIO DAS FUNÇÕES===============================================
+
+void playMusic(){
+    PlaySound(TEXT("bombermanMusica.wav"), NULL,
+              SND_FILENAME | SND_ASYNC | SND_LOOP);
+}
+
+ // Retorna a data e a hora atuais
+string dataHourNow() {
+    time_t now = time(nullptr);
+    tm* dataNow = localtime(&now);
+
+    char buffer[20];
+    strftime(buffer, sizeof(buffer), "%d-%m-%Y %H:%M:%S", dataNow);
+
+    return string(buffer);
+}
+
+// Carrega todos os saves do arquivo organizado por data
+vector<Ranking> loadSaves(const string& fileName = "saves_data.txt") {
+    vector<Ranking> saves;
+    ifstream file(fileName);
+
+    string row;
+
+    while (getline(file, row)) {
+        stringstream ss(row);
+        string field;
+        Ranking save;
+
+        try {
+            getline(ss, save.dataHour, ';');
+            getline(ss, save.nick, ';');
+
+            getline(ss, field, ';');
+            save.totalScore = stoi(field);
+
+            getline(ss, field, ';');
+            save.levelReached = stoi(field);
+
+            getline(ss, field, ';');
+            save.totalKills = stoi(field);
+
+            getline(ss, field, ';');
+            save.totalWallsBreaked = stoi(field);
+
+            getline(ss, field, ';');
+            save.totalBombsPlaces = stoi(field);
+
+            getline(ss, field, ';');
+            save.totalMoves = stoi(field);
+
+            saves.push_back(save);
+        }
+        catch (...) {
+            // Ignora uma linha que esteja incompleta ou inválida
+        }
+    }
+
+    file.close();
+    return saves;
+}
+
+// Escreve todos os saves no arquivo informado
+void typeSaves(const string& fileName, const vector<Ranking>& saves) {
+    ofstream file(fileName);
+
+    for (const Ranking& save : saves) {
+        file << save.dataHour << ';'
+             << save.nick << ';'
+             << save.totalScore << ';'
+             << save.levelReached << ';'
+             << save.totalKills << ';'
+             << save.totalWallsBreaked << ';'
+             << save.totalBombsPlaces << ';'
+             << save.totalMoves << '\n';
+    }
+
+    file.close();
+}
+
+// Registra uma partida nos dois arquivos
+void registerSave(Ranking newSave) {
+    vector<Ranking> savesData = loadSaves();
+
+    // Adiciona a nova partida sem apagar as anteriores
+    savesData.push_back(newSave);
+
+    // Ordena da partida mais recente para a mais antiga
+    sort(savesData.begin(), savesData.end(),
+         [](const Ranking& a, const Ranking& b) {
+             return a.dataHour > b.dataHour;
+         });
+
+    typeSaves("saves_data.txt", savesData);
+
+    // Cria uma cópia para ordenar pela pontuação
+    vector<Ranking> savesScore = savesData;
+
+    sort(savesScore.begin(), savesScore.end(),
+         [](const Ranking& a, const Ranking& b) {
+             if (a.totalScore != b.totalScore) {
+                 return a.totalScore > b.totalScore;
+             }
+
+             // Em caso de empate, a partida mais recente vem primeiro
+             return a.dataHour > b.dataHour;
+         });
+
+    typeSaves("saves_score.txt", savesScore);
+}
+
+void ranking() {
+    vector<Ranking> saves = loadSaves("saves_score.txt");
+
+    system("cls");
+
+    cout << "\n========== RANKING ==========\n\n";
+
+    if (saves.empty()) {
+        cout << "Nenhuma partida registrada.\n";
+    } else {
+        for (size_t i = 0; i < saves.size(); i++) {
+            cout << i + 1 << " - " << saves[i].nick
+                 << " | Pontuacao: " << saves[i].totalScore
+                 << " | Fase: " << saves[i].levelReached
+                 << " | Inimigos eliminados: " << saves[i].totalKills
+                 << "\n";
+        }
+    }
+
+    cout << "\nPressione ENTER para voltar ao menu.";
+
+    while (_getch() != 13) {
+    }
+}
+
+void career() {
+    vector<Ranking> saves = loadSaves();
+
+    system("cls");
+
+    cout << "\n========== CARREIRA ==========\n\n";
+
+    if (saves.empty()) {
+        cout << "Nenhuma partida registrada.\n";
+    } else {
+        for (size_t i = 0; i < saves.size(); i++) {
+            cout << "Partida " << i + 1
+                 << " - " << saves[i].nick << "\n";
+
+            cout << "Data: " << saves[i].dataHour << "\n";
+            cout << "Pontuacao: " << saves[i].totalScore << "\n";
+            cout << "Fase alcancada: " << saves[i].levelReached << "\n";
+            cout << "Inimigos eliminados: " << saves[i].totalKills << "\n";
+            cout << "Paredes destruidas: "
+                 << saves[i].totalWallsBreaked << "\n";
+            cout << "Bombas colocadas: "
+                 << saves[i].totalBombsPlaces << "\n";
+            cout << "Movimentos: " << saves[i].totalMoves << "\n";
+
+            cout << "------------------------------\n";
+        }
+    }
+
+    cout << "\nPressione ENTER para voltar ao menu.";
+
+    while (_getch() != 13) {
+    }
+}
 
 // Criação do Boss
 void spawnBoss(Enemy &boss, int (&mapGrid)[13][19]){
@@ -555,8 +745,6 @@ void intelligentEnemyMovement(bool &hasMoved, int &attempts, Enemy &enemies, int
 }
 // FIM DAS FUNÇÕES DE MOVIMENTOS DOS INIMIGOS
 
-
-
 // FUNÇÃO DE PASSAR PARA A PROX FASE
 void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, Enemy enemies[], int &powerUpsNumber, PowerUp (&powerUps)[], Enemy &boss, Bomb bombs[]){
     int newMap[13][19]=  { 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
@@ -640,6 +828,23 @@ void configurarConsole(COORD &coord) {
     ///FIM DO TRECHO
 }
 
+void drawBossBar(Enemy &boss) {
+    cout << endl;
+    cout << "\033[91m";
+    cout << "       ========================================\n";
+    cout << "                      O Professor\n";
+    cout << "       ========================================\n";
+    cout << "\033[0m";
+    cout << "                     [";
+
+    for (int i = 0; i < 3; i++) {
+        if (i < boss.lifes)
+            cout << "\033[91m ❤️ \033[0m";
+        else
+            cout << "\033[90m -- \033[0m";
+    }
+    cout << "]";
+}
 
 // ========================================FIM DAS FUNÇÕES=================================================
 
@@ -648,6 +853,8 @@ void configurarConsole(COORD &coord) {
 
 
 int main() {
+
+    playMusic();
 
 	COORD coord;
     configurarConsole(coord);
@@ -672,11 +879,37 @@ int main() {
 		player = {.x = 1, .y = 1, .maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .alive = true, .immuneToExplosion = false};
         score = 0;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
-        currentLevel = 1;
+        currentLevel = 4;
         enteredPortal = false;
-        int enemiesAmount = 5;
-		GAME.powerUpsNumber = 0;
+        int enemiesAmount;
+		    GAME.powerUpsNumber = 0;
 
+
+        int enemyRandomMoveChance;
+        float enemyMovementSpeed;
+        float bossMovementSpeed;
+
+        switch (difficulty) {
+            case 1:
+                enemyRandomMoveChance = 0;
+                enemyMovementSpeed = 1.5;
+                bossMovementSpeed = 1;
+                enemiesAmount = 3;
+            break;
+            case 2:
+                enemyRandomMoveChance = 1;
+                enemyMovementSpeed = 1;
+                bossMovementSpeed = .7;
+                enemiesAmount = 5;
+            break;
+            case 3:
+                enemyRandomMoveChance = 3;
+                enemyMovementSpeed = 0.7;
+                bossMovementSpeed = .5;
+                enemiesAmount = 7;
+            break;
+
+        }
 
         for (int i = 0; i < 13; i++) {
             for (int j = 0; j < 19; j++) {
@@ -717,36 +950,14 @@ int main() {
 
         mapGeneration(enemiesAmount, enemies, player, mapGrid, GAME.powerUpsNumber, powerUps, boss);
 
-        int enemyRandomMoveChance;
-        float enemyMovementSpeed;
-        float bossMovementSpeed;
-
-        switch (difficulty) {
-            case 1:
-                enemyRandomMoveChance = 0;
-                enemyMovementSpeed = 1.5;
-                bossMovementSpeed = 1;
-            break;
-            case 2:
-                enemyRandomMoveChance = 1;
-                enemyMovementSpeed = 1;
-                bossMovementSpeed = .7;
-            break;
-            case 3:
-                enemyRandomMoveChance = 3;
-                enemyMovementSpeed = 0.7;
-                bossMovementSpeed = .5;
-            break;
-
-        }
-
         //Variavel para tecla pressionada
         char keyPressed;
 
+        player = {.maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .immuneToExplosion = false};
+
+
         //Começa o jogo de verdade
         while(player.alive && currentLevel < 5){
-
-            player = {.maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .immuneToExplosion = false};
 
             while(player.alive && enteredPortal == false){ //Condição de VITÓRIA: Passar pelo portal. Condição de DERROTA: Morrer
 
@@ -756,7 +967,9 @@ int main() {
                 // Imprime o jogo: mapa, personagem e inimigos.
                 drawMap(mapGrid, player, bombs, score);
 
-
+                if (currentLevel == 4 && boss.lifes > 0) {
+                    drawBossBar(boss);
+                }
 
                 cout << "                   Powerups: " << GAME.powerUpsNumber << "\033[K" << endl;
 
@@ -1013,6 +1226,12 @@ int main() {
                     }
             }
         }
+
+        if(player.totalMovement % 2 == 0)
+            score -= player.totalMovement / 2;
+        else
+            score -= (player.totalMovement - 1) / 2;
+
         cout << "\033[2J\033[H";
 
         cout << endl;
@@ -1030,40 +1249,46 @@ int main() {
 
         cout << "  |                                                |" << endl;
         cout << "  +------------------------------------------------+" << endl;
-        cout << "  |                  SEUS STATUS                  |" << endl;
-        cout << "  +------------------------------------------------+" << endl;
-        cout << "  |                                                |" << endl;
-
-        cout << "  |  Fase alcancada:       "
-             << currentLevel << "                            |" << endl;
-
-        cout << "  |  Pontuacao final:      "
-             << score << "                         |" << endl;
-
-        cout << "  |  Inimigos eliminados:  "
-             << player.enemiesKilled << "                            |" << endl;
-
-        cout << "  |  Paredes quebradas:    "
-             << player.totalWallsBroken << "                            |" << endl;
-
-        cout << "  |  Bombas colocadas:     "
-             << player.bombsPlaced << "                            |" << endl;
-
-        cout << "  |  Movimentos realizados:"
-             << player.totalMovement << "                            |" << endl;
-
-        cout << "  |                                                |" << endl;
+        cout << "  |                  SEUS STATUS                   |" << endl;
         cout << "  +------------------------------------------------+" << endl;
         cout << endl;
-        cout << "       Aperte ENTER para voltar ao Menu.";
 
-        while (true) {
-            char enter = _getch();
+        cout << "    Fase alcancada:            "
+             << currentLevel << "                            " << endl;
 
-            if (enter == 13) {
-                break;
-            }
-        }
+        cout << "    Pontuacao final:           "
+             << score << "                         |" << endl;
+
+        cout << "    Inimigos eliminados:       "
+             << player.enemiesKilled << "                            " << endl;
+
+        cout << "    Paredes quebradas:         "
+             << player.totalWallsBroken << "                            " << endl;
+
+        cout << "    Bombas colocadas:          "
+             << player.bombsPlaced << "                            " << endl;
+
+        cout << "    Movimentos realizados:     "
+             << player.totalMovement << "                            " << endl;
+
+        cout << "                                                  " << endl;
+        cout << "  +------------------------------------------------+" << endl;
+        cout << endl;
+        cout << "       Digite seu apelido para salvar no ranking." << endl;
+        cout<<  "             .. ";
+        getline(cin >> ws, player.nick);
+
+        Ranking save;
+        save.dataHour = dataHourNow();
+        save.levelReached = currentLevel;
+        save.nick = player.nick;
+        save.totalBombsPlaces = player.totalBombsPlaced;
+        save.totalKills = player.enemiesKilled;
+        save.totalMoves = player.totalMovement;
+        save.totalWallsBreaked = player.totalWallsBroken;
+        save.totalScore = score;
+
+        registerSave(save);
 
     }
 
