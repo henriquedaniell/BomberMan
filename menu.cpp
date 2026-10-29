@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <conio.h>
 #include <limits>
@@ -8,50 +7,134 @@ using namespace std;
 
 string difficultyString = "Facil";
 int difficulty = 1;
+bool IAPlay = false;
+bool twoPlayers = false; // Modo de dois jogadores (exclusivo com o IAPlay)
+
+// Espera o ENTER para passar de pagina
+void waitEnter() {
+    while (_getch() != 13) {
+        // Aguarda o ENTER
+    }
+}
 
 void instructions() {
+    // ---------------- PAGINA 1: CONTROLES ----------------
     system("cls");
 
     cout << endl;
     cout << "  +------------------------------------------------+" << endl;
-    cout << "  |                  INSTRUCOES                    |" << endl;
+    cout << "  |            INSTRUCOES - 1/3 CONTROLES          |" << endl;
+    cout << "  +------------------------------------------------+" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  UM JOGADOR                                    |" << endl;
+    cout << "  |  W A S D ou SETAS       - Mover                |" << endl;
+    cout << "  |  F, ESPACO ou ENTER     - Colocar bomba        |" << endl;
+    cout << "  |  R                      - Detonar bomba remota |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  DOIS JOGADORES                                |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  Jogador 1                                     |" << endl;
+    cout << "  |  W A S D                - Mover                |" << endl;
+    cout << "  |  ESPACO (ou F)          - Colocar bomba        |" << endl;
+    cout << "  |  R                      - Detonar bomba remota |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  Jogador 2                                     |" << endl;
+    cout << "  |  SETAS DO TECLADO       - Mover                |" << endl;
+    cout << "  |  ENTER                  - Colocar bomba        |" << endl;
+    cout << "  |  P                      - Detonar bomba remota |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  +------------------------------------------------+" << endl;
+    cout << endl;
+    cout << "       Pressione ENTER para continuar.";
+
+    waitEnter();
+
+    // ---------------- PAGINA 2: POWER-UPS ----------------
+    system("cls");
+
+    cout << endl;
+    cout << "  +------------------------------------------------+" << endl;
+    cout << "  |            INSTRUCOES - 2/3 POWER-UPS          |" << endl;
+    cout << "  +------------------------------------------------+" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  Os power-ups ficam escondidos dentro das      |" << endl;
+    cout << "  |  paredes amarelas. Quebre a parede para que    |" << endl;
+    cout << "  |  o item apareca e passe por cima dele.         |" << endl;
+    cout << "  |  Cada um vale 20 pontos.                       |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  🔥+ ALCANCE                                   |" << endl;
+    cout << "  |  Aumenta em 1 o alcance das suas explosoes.    |" << endl;
+    cout << "  |  Permanente, ate o limite de 10.               |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  🧨+ BOMBA EXTRA                               |" << endl;
+    cout << "  |  Mais uma bomba ao mesmo tempo no mapa.        |" << endl;
+    cout << "  |  Permanente, ate o limite de 5.                |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  🛡️+ IMUNIDADE (10s)                           |" << endl;
+    cout << "  |  Andar sobre explosoes nao mata.               |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  👻+ NOCLIP (10s)                              |" << endl;
+    cout << "  |  Atravessa paredes amarelas. Se o tempo        |" << endl;
+    cout << "  |  acabar com voce dentro de uma, ela quebra     |" << endl;
+    cout << "  |  sem dar pontos. Nao da pra soltar bomba       |" << endl;
+    cout << "  |  de dentro da parede.                          |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  💥+ EXPLOSAO EXTREMA (10s)                    |" << endl;
+    cout << "  |  Toda bomba colocada durante esse tempo sai    |" << endl;
+    cout << "  |  com alcance maximo. Quando acaba, o alcance   |" << endl;
+    cout << "  |  volta ao normal.                              |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  |  📱+ BOMBA REMOTA (3 bombas)                   |" << endl;
+    cout << "  |  As 3 proximas bombas so explodem quando       |" << endl;
+    cout << "  |  voce mandar (R ou P). Se esquecer, elas tem   |" << endl;
+    cout << "  |  um pavio de seguranca de 15 segundos.         |" << endl;
+    cout << "  |                                                |" << endl;
+    cout << "  +------------------------------------------------+" << endl;
+    cout << endl;
+    cout << "       Pressione ENTER para continuar.";
+
+    waitEnter();
+
+    // ---------------- PAGINA 3: ELEMENTOS E OBJETIVO ----------------
+    system("cls");
+
+    cout << endl;
+    cout << "  +------------------------------------------------+" << endl;
+    cout << "  |         INSTRUCOES - 3/3 ELEMENTOS DO JOGO     |" << endl;
     cout << "  +------------------------------------------------+" << endl;
     cout << "  |                                                |" << endl;
     cout << "  |  OBJETIVO                                      |" << endl;
-    cout << "  |  Derrote os inimigos e encontre o portal       |" << endl;
-    cout << "  |  para avancar para a proxima fase.             |" << endl;
+    cout << "  |  Elimine todos os inimigos e entre no portal   |" << endl;
+    cout << "  |  para avancar de fase. Na fase 4 e preciso     |" << endl;
+    cout << "  |  derrotar tambem o boss.                       |" << endl;
     cout << "  |                                                |" << endl;
-    cout << "  |  CONTROLES                                     |" << endl;
-    cout << "  |  W ou SETA PARA CIMA    - Mover para cima      |" << endl;
-    cout << "  |  S ou SETA PARA BAIXO   - Mover para baixo     |" << endl;
-    cout << "  |  A ou SETA PARA ESQUERDA- Mover para esquerda  |" << endl;
-    cout << "  |  D ou SETA PARA DIREITA - Mover para direita   |" << endl;
-    cout << "  |  F, ESPACO ou ENTER     - Colocar uma bomba    |" << endl;
-    cout << "  |                                                |" << endl;
-    cout << "  |  ELEMENTOS DO JOGO                             |" << endl;
+    cout << "  |  MAPA                                          |" << endl;
     cout << "  |  Paredes cinzas: indestrutiveis                |" << endl;
     cout << "  |  Paredes amarelas: podem ser destruidas        |" << endl;
-    cout << "  |  Inimigos: encostar neles causa derrota        |" << endl;
-    cout << "  |  Bombas: cuidado com o alcance da explosao     |" << endl;
-    cout << "  |  Portal: permite tentar avancar de fase        |" << endl;
+    cout << "  |  🌀 Portal: leva para a proxima fase           |" << endl;
+    cout << "  |  👾 Inimigo: encostar nele causa derrota       |" << endl;
+    cout << "  |  😈 Boss: aguenta 3 explosoes                  |" << endl;
     cout << "  |                                                |" << endl;
-    cout << "  |  POWER-UPS                                     |" << endl;
-    cout << "  |  🔥+ Aumenta o alcance da explosao             |" << endl;
-    cout << "  |  🧨+ Permite colocar mais bombas ao mesmo tempo|" << endl;
-    cout << "  |  🛡️+ Permite andar sobre explosoes sem morrer  |" << endl;
+    cout << "  |  JOGADORES                                     |" << endl;
+    cout << "  |  🤠 Jogador 1    🥷 Jogador 2                  |" << endl;
+    cout << "  |  😇 com imunidade   🫥 com noclip              |" << endl;
     cout << "  |                                                |" << endl;
+    cout << "  |  DOIS JOGADORES                                |" << endl;
+    cout << "  |  O modo e cooperativo, mas a bomba de um       |" << endl;
+    cout << "  |  mata o outro! Se um morrer, o outro continua  |" << endl;
+    cout << "  |  sozinho e o que morreu volta na proxima       |" << endl;
+    cout << "  |  fase. Basta um entrar no portal.              |" << endl;
+    cout << "  |  Os power-ups sao independentes.               |" << endl;
     cout << "  |                                                |" << endl;
-    cout << "  |  IMPORTANTE                                    |" << endl;
-    cout << "  |  Elimine todos os inimigos antes de usar       |" << endl;
-    cout << "  |  o portal. Na fase 4, derrote tambem o boss!   |" << endl;
+    cout << "  |  PONTOS                                        |" << endl;
+    cout << "  |  Inimigo 250   Parede 10   Power-up 20         |" << endl;
+    cout << "  |  Cada 2 movimentos custam 1 ponto no final.    |" << endl;
     cout << "  |                                                |" << endl;
     cout << "  +------------------------------------------------+" << endl;
     cout << endl;
     cout << "       Pressione ENTER para voltar ao menu.";
 
-    while (_getch() != 13) {
-        // Aguarda o ENTER
-    }
+    waitEnter();
 }
 
 // ========================================
@@ -84,9 +167,7 @@ void credits() {
     cout << endl;
     cout << "       Pressione ENTER para voltar ao menu.";
 
-    while (_getch() != 13) {
-        // Aguarda o ENTER
-    }
+    waitEnter();
 }
 
 // ========================================
@@ -163,6 +244,148 @@ void chooseDifficulty(int &difficulty, string &difficultyString) {
 }
 
 // ========================================
+// FUNCAO: MODO DE DOIS JOGADORES
+// ========================================
+
+void chooseTwoPlayers() {
+    int escolha;
+    int intTwoPlayers;
+
+    while (true) {
+
+        if(twoPlayers)
+            intTwoPlayers = 2;
+        else
+            intTwoPlayers = 1;
+
+        system("cls");
+
+        cout << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |            Dois Jogadores              |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |                                        |" << endl;
+        cout << "  |  1 - Desativado                        |" << endl;
+        cout << "  |  2 - Ativado                           |" << endl;
+        cout << "  |                                        |" << endl;
+        cout << "  |  P1: WASD, ESPACO para bomba, R        |" << endl;
+        cout << "  |  P2: SETAS, ENTER para bomba, P        |" << endl;
+        cout << "  |                                        |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |  Atual: ";
+
+        switch (intTwoPlayers) {
+            case 1:
+                cout << "Desativado";
+                break;
+            case 2:
+                cout << "Ativado   ";
+                break;
+        }
+
+        cout << "                     |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << endl;
+        cout << "  Escolha (1-2) ou 0 para voltar: ";
+
+        cin >> escolha;
+
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            continue;
+        }
+
+        if (escolha == 0) {
+            return;
+        }
+
+        if (escolha < 1 || escolha > 2) {
+            continue;
+        }
+
+        switch (escolha) {
+            case 1:
+                twoPlayers = false;
+                break;
+            case 2:
+                twoPlayers = true;
+                IAPlay = false; // Os dois modos nao podem ficar ligados juntos
+                break;
+        }
+
+        return;
+    }
+}
+
+void playAlone() {
+    int escolha;
+    int intIAPlay;
+    while (true) {
+
+        if(IAPlay)
+            intIAPlay = 2;
+        else
+            intIAPlay = 1;
+
+        system("cls");
+
+        cout << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |             Jogar Sozinho              |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |                                        |" << endl;
+        cout << "  |  1 - Desativado                        |" << endl;
+        cout << "  |  2 - Ativado                           |" << endl;
+        cout << "  |                                        |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |  Atual: ";
+
+        switch (intIAPlay) {
+            case 1:
+                cout << "Desativado";
+                break;
+            case 2:
+                cout << "Ativado   ";
+                break;
+        }
+
+        cout << "                     |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << endl;
+        cout << "  Escolha (1-2) ou 0 para voltar: ";
+
+        cin >> escolha;
+
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            continue;
+        }
+
+        if (escolha == 0) {
+            return;
+        }
+
+        if (escolha < 1 || escolha > 2) {
+            continue;
+        }
+
+        switch (escolha) {
+            case 1:
+                IAPlay = false;
+                break;
+            case 2:
+                IAPlay = true;
+                twoPlayers = false; // Os dois modos nao podem ficar ligados juntos
+                break;
+        }
+
+        return;
+    }
+}
+
+// ========================================
 // MENU PRINCIPAL
 // ========================================
 
@@ -205,6 +428,15 @@ bool menu(bool &alreadyPlayed) {
         cout << "  |  6 - Creditos                          |" << endl;
         cout << "  |  7 - Sair                              |" << endl;
         cout << "  |                                        |" << endl;
+        if(!twoPlayers)
+            cout << "  |  9 - Dois Jogadores (Desativado)       |" << endl;
+        else
+            cout << "  |  9 - Dois Jogadores (Ativado)          |" << endl;
+        if(!IAPlay)
+            cout << "  |  0 - Jogar Sozinho (Desativado)        |" << endl;
+        else
+            cout << "  |  0 - Jogar Sozinho (Ativado)           |" << endl;
+        cout << "  |                                        |" << endl;
         cout << "  +----------------------------------------+" << endl;
         cout << endl;
         cout << "  Escolha uma opcao: ";
@@ -243,6 +475,14 @@ bool menu(bool &alreadyPlayed) {
 
             case 7:
                 return false;
+
+            case 9:
+                chooseTwoPlayers();
+                break;
+
+            case 0:
+                playAlone();
+                break;
 
             default:
                 break;
