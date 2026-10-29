@@ -15,9 +15,12 @@
 #include <ctime>
 #include <mmsystem.h>
 #include <cmath>
+#include <queue>
+#include <utility>
 
 void ranking();
 void career();
+void resetAI();
 #include "menu.cpp"
 
 using namespace std;
@@ -46,13 +49,47 @@ PARA FAZER (EDUARDO):
 // ========================================VARIAVEIS GLOBAIS=================================================
 
 int score = 0; // Pontuação do jogo
-int currentLevel = 4; // Controla a fase
+int currentLevel = 1; // Controla a fase
 bool enteredPortal = false; // Confirma se entrou no portal
 bool alreadyPlayed = false; // controla o 'Jogar Novamente'
 
-enum PowerUpType {NOT_PLACED, MORE_EXPLOSION_RANGE, EXTRA_BOMB, EXPLOSION_IMMNUNITY, NOCLIP, EXTREME_EXPLOSION};
+const int MAX_REMOTE_BOMBS = 3; // Quantas bombas remotas o powerup concede
 
+enum PowerUpType {
+    NOT_PLACED,
+    MORE_EXPLOSION_RANGE,
+    EXTRA_BOMB,
+    EXPLOSION_IMMNUNITY,
+    NOCLIP,
+    EXTREME_EXPLOSION,
+    REMOTE_BOMB};
 
+enum AIState {
+    SEARCHING,
+    GOING_TO_ATTACK,
+    ESCAPING,
+    GOING_TO_PORTAL
+};
+
+AIState aiState = SEARCHING;
+
+int aiTarget = -1;
+
+int aiAttackX = -1;
+int aiAttackY = -1;
+
+int aiEscapeX = -1;
+int aiEscapeY = -1;
+
+int aiPortalX = -1;
+int aiPortalY = -1;
+
+bool aiTargetWall = false;
+
+int aiWallX = -1;
+int aiWallY = -1;
+
+int aiBombIndex = -1;
 // =================FUNCAO DE DIRECOES================
 int& fourDirectionsValueReturner(int dir, int range, int gameMap[13][19], int x, int y, bool explosion = false, int* newX = nullptr, int* newY = nullptr) {
 	int posRange = abs(range);
@@ -101,6 +138,8 @@ struct GeneralGame {
 	int 			explosionCountingGrid[13][19] = {0};
 	PowerUpType		powerUpGrid[13][19] = {static_cast<PowerUpType>(0)};
 	int 			maxPowerUps = 15, powerUpsNumber = 0, gameSeconds = 0;
+	bool			extremeExplosion = false; // Enquanto ativo, toda bomba colocada sai com alcance maximo
+	string			extremeTexture = "";
 	chrono::steady_clock::time_point extremeExplosionTimer = chrono::steady_clock::now(), gameStartTime = chrono::steady_clock::now();
 };
 GeneralGame GAME;
@@ -114,10 +153,10 @@ struct PowerUp {
 
 // STRUCT DE PERSONAGEM JOGADOR
 struct Character {
-    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0, range = 1, lastPowerUpPicked;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
-    string immntyTexture = "", nick;
-    
-    bool alive = true, immuneToExplosion = false;
+    int x=1, y=1, maxConcurrentBombs, totalBombsPlaced = 0, bombsPlaced = 0, enemiesKilled = 0, totalMovement = 0, totalWallsBroken = 0, range = 1, lastPowerUpPicked, remoteBombsLeft = 0;       // Variáveis para posição do player e máximo de bombas que ele pode colocar
+    string immntyTexture = "", noClipTexture = "", nick;
+
+    bool alive = true, immuneToExplosion = false, noClip = false;
 
     chrono::steady_clock::time_point immunityTimer = chrono::steady_clock::now(), noClipTimer = chrono::steady_clock::now();
 
@@ -125,6 +164,17 @@ struct Character {
         if (gameMap[y + newY][x + newX] == 0 || (gameMap[y + newY][x + newX] == 4 && immuneToExplosion)) {
             x += newX;           // Move o player caso haja caminho livre
             y += newY;
+        }
+        else if (noClip && (gameMap[y + newY][x + newX] == 2 || gameMap[y + newY][x + newX] == 7)) {
+            x += newX;           // Com o noclip o player atravessa paredes DESTRUTIVEIS
+            y += newY;
+
+            // Entrar numa caixa de powerup destroi o item que estava guardado nela
+            if (gameMap[y][x] == 7) {
+                powerUpsNumber--;
+                GAME.powerUpGrid[y][x] = static_cast<PowerUpType>(0);
+                gameMap[y][x] = 2;
+            }
         }
         else if(gameMap[y + newY][x + newX] == 5 || (gameMap[y + newY][x + newX] == 4 && !immuneToExplosion) || gameMap[y + newY][x + newX] == 10) {
             alive = false; // Player morre se der de cara com um inimigo ou com uma casa de explosão da bomba
@@ -148,6 +198,17 @@ struct Character {
 				case EXPLOSION_IMMNUNITY:
 					immuneToExplosion = true;
 					immunityTimer = chrono::steady_clock::now();
+					break;
+				case NOCLIP:
+					noClip = true;
+					noClipTimer = chrono::steady_clock::now();
+					break;
+				case EXTREME_EXPLOSION:
+					GAME.extremeExplosion = true;
+					GAME.extremeExplosionTimer = chrono::steady_clock::now();
+					break;
+				case REMOTE_BOMB:
+					remoteBombsLeft = MAX_REMOTE_BOMBS;
 					break;
 			}
 
@@ -240,6 +301,7 @@ struct Enemy {
 struct Bomb {
     int x, y, texture = 0;
     bool placed = false;
+    bool isRemote = false; // Bomba remota: so explode no R (ou no pavio de seguranca de 15s)
 
 
     // Inicialização variavel que armazena o timer da bomba
@@ -355,6 +417,7 @@ struct Bomb {
 	}
 
 	void explode(int (&gameMap)[13][19], int &score, Character &player, Bomb (&bombs)[], Enemy (&enemies)[], Enemy &boss, int enemiesAmount) {
+		isRemote = false; // A bomba deixa de ser remota assim que detona
 		gameMap[y][x] = 4;
 		GAME.explosionCountingGrid[y][x]++;
 		explosion.isExploding = true;
@@ -595,7 +658,7 @@ void wallsGeneration(int (&gameMap)[13][19], int &powerUpsNumber, PowerUp (&powe
 					powerUps[powerUpsNumber].x = j;
 					powerUps[powerUpsNumber].y = i;
 
-					uniform_int_distribution<> randomPowerUpType(1, 3);
+					uniform_int_distribution<> randomPowerUpType(1, 6);
 					int randIndex = randomPowerUpType(gen);
 					PowerUpType powerUpType = static_cast<PowerUpType>(randIndex);
 
@@ -665,7 +728,9 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
 	for(int i=0;i<13;i++){
 	    for(int j=0;j<19;j++){
 	        if(i==player.y && j==player.x){
-                if (player.immuneToExplosion)
+                if (player.noClip)
+                    cout<< "🫥 "; //Personagem atravessando paredes
+                else if (player.immuneToExplosion)
                     cout<< "😇 "; //Personagem
                 else
                     cout<< "🤠 "; //Personagem
@@ -676,11 +741,17 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
 	                case 2: case 7: cout << "\033[33m" << "▓▓▓" << "\033[0m"; break; // Parede DESTRUTÍVEL OU Parede com POWERUP BOX
 	                case 3: {
 						int tex = 0;
+						bool remote = false;
 	                    for (int k = 0; k < player.maxConcurrentBombs; k++) {
-                            if (bomb[k].placed && i == bomb[k].y && j == bomb[k].x)
+                            if (bomb[k].placed && i == bomb[k].y && j == bomb[k].x) {
                                 tex = bomb[k].texture;
+                                remote = bomb[k].isRemote;
+                            }
 	                    }
-						cout << bombColor(tex) << "💣ʔ" << "\033[0m";
+						if (remote)
+							cout << "📱 "; // Bomba remota (espera o R)
+						else
+							cout << bombColor(tex) << "💣ʔ" << "\033[0m";
                         break;
                     }
 	                case 4: cout << "\033[33m" << "💥 " << "\033[0m"; break; // Explosão
@@ -696,6 +767,12 @@ void drawMap(int (&gameMap)[13][19], Character player, Bomb bomb[], int score){
                                 cout << "\033[92m" << "🧨+" << "\033[0m"; break; // powerup
                             case EXPLOSION_IMMNUNITY:
                                 cout << "\033[92m" << "🛡️+" << "\033[0m"; break; // powerup
+                            case NOCLIP:
+                                cout << "\033[92m" << "👻+" << "\033[0m"; break; // powerup
+                            case EXTREME_EXPLOSION:
+                                cout << "\033[92m" << "💥+" << "\033[0m"; break; // powerup
+                            case REMOTE_BOMB:
+                                cout << "\033[92m" << "📱+" << "\033[0m"; break; // powerup
                             default:
                                 cout << "\033[92m" << "🌟 " << "\033[0m"; break; // powerup
                         }
@@ -786,6 +863,7 @@ void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, En
     for (int k = 0; k < player.maxConcurrentBombs; k++) {
         bombs[k].placed = false;
         bombs[k].texture = 0;
+        bombs[k].isRemote = false;
         bombs[k].explosion.isExploding = false;
 
         bombs[k].bombTimer = chrono::steady_clock::now();
@@ -797,6 +875,8 @@ void nextLevel (int (&mapGrid)[13][19], int enemiesAmount, Character &player, En
     player.y = 1;
     player.alive = true;
     enteredPortal = false;
+
+    resetAI();
 
     for (int i = 0; i < enemiesAmount; i++) {
         enemies[i].lifes = 1;
@@ -856,6 +936,645 @@ void drawBossBar(Enemy &boss) {
     cout << "]";
 }
 
+// HUD dos powerups: cada linha so aparece enquanto aquele powerup estiver ativo.
+void drawPowerUpBars(Character &player) {
+    if (player.noClip)
+        cout << " NOCLIP: \033[97m" << player.noClipTexture << "\033[0m\033[K" << endl;
+
+    if (GAME.extremeExplosion)
+        cout << " EXPLOSAO EXTREMA: \033[38;5;208m" << GAME.extremeTexture << "\033[0m\033[K" << endl;
+
+    if (player.remoteBombsLeft > 0) {
+        cout << " BOMBAS REMOTAS (R): ";
+        for (int i = 0; i < MAX_REMOTE_BOMBS; i++) {
+            if (i < player.remoteBombsLeft)
+                cout << "📱";
+            else
+                cout << "\033[90m--\033[0m";
+        }
+        cout << "\033[K" << endl;
+    }
+}
+
+int foundTarget(Character &player, Enemy enemies[], int enemiesAmount) {
+    int nearestEnemy = -1;
+    int nearestDistance = 999;
+
+    for (int i = 0; i < enemiesAmount; i++) {
+        if (enemies[i].lifes <= 0)
+            continue;
+
+        int distanceX = abs(player.x - enemies[i].x);
+        int distanceY = abs(player.y - enemies[i].y);
+
+        int distance = distanceX + distanceY;
+
+        if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestEnemy = i;
+        }
+    }
+
+    return nearestEnemy;
+}
+
+bool findAttackPosition(Character &player, int (&mapGrid)[13][19], Enemy &target, int &attackX, int &attackY){
+    int dx[4] = {0, 1, 0, -1};
+    int dy[4] = {-1, 0, 1, 0};
+
+    int bestDistance = 999;
+    bool found = false;
+
+    for (int i = 0; i < 4; i++) {
+        int x = target.x + dx[i];
+        int y = target.y + dy[i];
+
+        if (x < 0 || x >= 19 || y < 0 || y >= 13)
+            continue;
+
+        if (mapGrid[y][x] != 0 && mapGrid[y][x] != 9)
+            continue;
+
+        int distance = abs(player.x - x) + abs(player.y - y);
+
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            attackX = x;
+            attackY = y;
+            found = true;
+        }
+    }
+
+    return found;
+}
+
+bool nextPathStep(int (&mapGrid)[13][19], int startX, int startY,int targetX, int targetY, int &nextX, int &nextY){
+    bool visited[13][19] = {};
+
+    int parentX[13][19];
+    int parentY[13][19];
+
+    queue<pair<int, int>> positions;
+
+    if (startX == targetX && startY == targetY) {
+        nextX = startX;
+        nextY = startY;
+        return true;
+    }
+
+    positions.push({startX, startY});
+    visited[startY][startX] = true;
+
+    int dx[4] = {0, 1, 0, -1};
+    int dy[4] = {-1, 0, 1, 0};
+
+    while (!positions.empty()) {
+        pair<int, int> current = positions.front();
+        positions.pop();
+
+        int x = current.first;
+        int y = current.second;
+
+        if (x == targetX && y == targetY) {
+            int pathX = targetX;
+            int pathY = targetY;
+
+            while (parentX[pathY][pathX] != startX ||
+                   parentY[pathY][pathX] != startY) {
+
+                int previousX = parentX[pathY][pathX];
+                int previousY = parentY[pathY][pathX];
+
+                pathX = previousX;
+                pathY = previousY;
+            }
+
+            nextX = pathX;
+            nextY = pathY;
+
+            return true;
+        }
+
+        for (int i = 0; i < 4; i++) {
+            int newX = x + dx[i];
+            int newY = y + dy[i];
+
+            if (newX < 0 || newX >= 19 ||
+                newY < 0 || newY >= 13) {
+                continue;
+            }
+
+            if (visited[newY][newX]) {
+                continue;
+            }
+
+            if (mapGrid[newY][newX] != 0 &&
+                mapGrid[newY][newX] != 9) {
+                continue;
+            }
+
+            visited[newY][newX] = true;
+
+            parentX[newY][newX] = x;
+            parentY[newY][newX] = y;
+
+            positions.push({newX, newY});
+        }
+    }
+
+    return false;
+}
+
+bool findPath(Character &player, int (&mapGrid)[13][19], int targetX, int targetY, bool &enteredPortal, int &score){
+
+    int nextX, nextY;
+
+    if (!nextPathStep(mapGrid, player.x, player.y, targetX, targetY, nextX, nextY)){
+        return false;
+    }
+
+    if (nextX == player.x && nextY == player.y) {
+        return true;
+    }
+
+    int moveX = nextX - player.x;
+    int moveY = nextY - player.y;
+
+    player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, score, moveX, moveY);
+
+    player.totalMovement++;
+
+    return true;
+}
+
+bool placeAIBomb(Character &player, int (&mapGrid)[13][19], Bomb (&bombs)[5], int &bombIndex){
+    if (player.totalBombsPlaced >= player.maxConcurrentBombs)
+        return false;
+
+    if (mapGrid[player.y][player.x] != 0)
+        return false;
+
+    for (int k = 0; k < player.maxConcurrentBombs && k < 5; k++) {
+        if (!bombs[k].placed) {
+            bombs[k].x = player.x;
+            bombs[k].y = player.y;
+            bombs[k].placed = true;
+            bombs[k].texture = 3;
+            bombs[k].explosion.range = GAME.extremeExplosion ? 10 : player.range;
+            bombs[k].isRemote = (player.remoteBombsLeft > 0);
+            bombs[k].bombTimer = chrono::steady_clock::now();
+
+            if (bombs[k].isRemote)
+                player.remoteBombsLeft--;
+
+            mapGrid[player.y][player.x] = 3;
+
+            player.totalBombsPlaced++;
+            player.bombsPlaced++;
+
+            bombIndex = k;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void markBombDanger(int (&mapGrid)[13][19], bool (&danger)[13][19], int bombX, int bombY, int range){
+    danger[bombY][bombX] = true;
+
+    int dx[4] = {0, 1, 0, -1};
+    int dy[4] = {-1, 0, 1, 0};
+
+    for (int dir = 0; dir < 4; dir++) {
+        for (int r = 1; r <= range; r++) {
+            int x = bombX + dx[dir] * r;
+            int y = bombY + dy[dir] * r;
+
+            if (x < 0 || x >= 19 || y < 0 || y >= 13)
+                break;
+
+            int tile = mapGrid[y][x];
+
+            // Paredes indestrutíveis e portal bloqueiam a explosão.
+            if (tile == 1 || tile == 8)
+                break;
+
+            // A parede destrutível é atingida e interrompe a explosão.
+            if (tile == 2 || tile == 7) {
+                danger[y][x] = true;
+                break;
+            }
+
+            // O Boss recebe dano e interrompe a explosão.
+            if (tile == 10) {
+                danger[y][x] = true;
+                break;
+            }
+
+            danger[y][x] = true;
+
+            // Outra bomba pode causar uma explosão em cadeia.
+            if (tile == 3)
+                break;
+        }
+    }
+}
+
+bool findEscapePosition(Character &player, int (&mapGrid)[13][19], int bombX, int bombY, int range, int &escapeX, int &escapeY){
+    bool danger[13][19] = {};
+
+    markBombDanger(mapGrid, danger, bombX, bombY, range);
+
+    int bestDistance = 999;
+    bool found = false;
+
+    for (int y = 1; y < 12; y++) {
+        for (int x = 1; x < 18; x++) {
+            if (mapGrid[y][x] != 0 && mapGrid[y][x] != 9)
+                continue;
+
+            if (danger[y][x])
+                continue;
+
+            int nextX, nextY;
+
+            // Confere se existe um caminho até a casa candidata.
+            if (!nextPathStep(
+                    mapGrid,
+                    player.x, player.y,
+                    x, y,
+                    nextX, nextY)) {
+                continue;
+            }
+
+            int distance = abs(player.x - x) + abs(player.y - y);
+
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                escapeX = x;
+                escapeY = y;
+                found = true;
+            }
+        }
+    }
+
+    return found;
+}
+
+bool findPortalApproach(Character &player, int (&mapGrid)[13][19], int &approachX, int &approachY, int &portalX, int &portalY){
+    int bestDistance = 999;
+    bool found = false;
+
+    int dx[4] = {0, 1, 0, -1};
+    int dy[4] = {-1, 0, 1, 0};
+
+    for (int y = 1; y < 12; y++) {
+        for (int x = 1; x < 18; x++) {
+            if (mapGrid[y][x] != 8)
+                continue;
+
+            for (int i = 0; i < 4; i++) {
+                int ax = x + dx[i];
+                int ay = y + dy[i];
+
+                if (ax < 0 || ax >= 19 || ay < 0 || ay >= 13)
+                    continue;
+
+                if (mapGrid[ay][ax] != 0 && mapGrid[ay][ax] != 9)
+                    continue;
+
+                int nextX, nextY;
+
+                if (!nextPathStep( mapGrid, player.x, player.y, ax, ay, nextX, nextY)) {
+                    continue;
+                }
+
+                int distance = abs(player.x - ax) + abs(player.y - ay);
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    approachX = ax;
+                    approachY = ay;
+                    portalX = x;
+                    portalY = y;
+                    found = true;
+                }
+            }
+        }
+    }
+
+    return found;
+}
+
+bool findWallAttackPosition(Character &player, int (&mapGrid)[13][19], int &attackX, int &attackY, int &wallX, int &wallY) {
+    int dx[4] = {0, 1, 0, -1};
+    int dy[4] = {-1, 0, 1, 0};
+
+    int bestDistance = 999;
+    bool found = false;
+
+    for (int y = 1; y < 12; y++) {
+        for (int x = 1; x < 18; x++) {
+            // Só interessa parede destrutível.
+            if (mapGrid[y][x] != 2 && mapGrid[y][x] != 7)
+                continue;
+
+            for (int i = 0; i < 4; i++) {
+                int ax = x + dx[i];
+                int ay = y + dy[i];
+
+                if (ax < 0 || ax >= 19 || ay < 0 || ay >= 13)
+                    continue;
+
+                if (mapGrid[ay][ax] != 0 && mapGrid[ay][ax] != 9)
+                    continue;
+
+                int nextX, nextY;
+
+                if (!nextPathStep(
+                        mapGrid,
+                        player.x, player.y,
+                        ax, ay,
+                        nextX, nextY)) {
+                    continue;
+                }
+
+                int distance = abs(player.x - ax) + abs(player.y - ay);
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    attackX = ax;
+                    attackY = ay;
+                    wallX = x;
+                    wallY = y;
+                    found = true;
+                }
+            }
+        }
+    }
+
+    return found;
+}
+
+void playerAIMovement(Character &player, int (&mapGrid)[13][19], Bomb (&bombs)[5], Enemy enemies[], int enemiesAmount, Enemy &boss, bool &enteredPortal, int &score){
+    // Controla a velocidade da IA.
+    static auto lastMove = chrono::steady_clock::now();
+
+    auto now = chrono::steady_clock::now();
+
+    if (chrono::duration_cast<chrono::milliseconds>(
+            now - lastMove).count() < 180) {
+        return;
+    }
+
+    lastMove = now;
+
+    if (aiState == SEARCHING) {
+        int target = foundTarget(player, enemies, enemiesAmount);
+
+        // Se o Boss estiver vivo, ele também pode ser escolhido.
+        if (currentLevel == 4 && boss.lifes > 0) {
+            int bossDistance =
+                abs(player.x - boss.x) + abs(player.y - boss.y);
+
+            if (target == -1) {
+                target = -2;
+            } else {
+                int enemyDistance =
+                    abs(player.x - enemies[target].x) +
+                    abs(player.y - enemies[target].y);
+
+                if (bossDistance < enemyDistance)
+                    target = -2;
+            }
+        }
+
+        if (target == -1) {
+            // Sem inimigos vivos: procurar o portal.
+            if (findPortalApproach(player, mapGrid, aiAttackX, aiAttackY, aiPortalX, aiPortalY)) {
+                aiState = GOING_TO_PORTAL;
+            }
+
+            return;
+        }
+
+        aiTarget = target;
+
+        Enemy &targetEnemy = (aiTarget == -2) ? boss : enemies[aiTarget];
+
+        bool foundAttack = findAttackPosition(
+            player, mapGrid, targetEnemy,
+            aiAttackX, aiAttackY
+        );
+
+        int nextX, nextY;
+
+        bool pathExists = false;
+
+        if (foundAttack) {
+            pathExists = nextPathStep(mapGrid, player.x, player.y, aiAttackX, aiAttackY, nextX, nextY);
+        }
+
+        if (foundAttack && pathExists) {
+            aiTargetWall = false;
+            aiState = GOING_TO_ATTACK;
+            return;
+        }
+
+        // Não existe caminho até o inimigo.
+        // Tenta destruir uma parede para abrir passagem.
+        if (findWallAttackPosition(player, mapGrid, aiAttackX, aiAttackY, aiWallX, aiWallY)) {
+
+            aiTargetWall = true;
+            aiTarget = -3;
+            aiState = GOING_TO_ATTACK;
+            return;
+        }
+
+        aiTarget = -1;
+        aiTargetWall = false;
+        return;
+    }
+
+    if (aiState == GOING_TO_ATTACK) {
+
+        if (aiTargetWall) {
+            // A parede pode já ter sido destruída por uma explosão.
+            if (mapGrid[aiWallY][aiWallX] != 2 && mapGrid[aiWallY][aiWallX] != 7){
+                aiState = SEARCHING;
+                aiTargetWall = false;
+                aiTarget = -1;
+                return;
+            }
+
+            // Recalcula a melhor posição para atacar a parede.
+            if (!findWallAttackPosition(player, mapGrid, aiAttackX, aiAttackY, aiWallX, aiWallY)) {
+                aiState = SEARCHING;
+                aiTargetWall = false;
+                aiTarget = -1;
+                return;
+            }
+
+            // Caminha até a posição de bombardeio.
+            if (player.x != aiAttackX || player.y != aiAttackY) {
+                findPath(player, mapGrid, aiAttackX, aiAttackY, enteredPortal, score);
+                return;
+            }
+
+            // Chegou ao lado da parede: tenta colocar a bomba.
+            if (placeAIBomb(player, mapGrid, bombs, aiBombIndex)) {
+                aiState = ESCAPING;
+
+                if (!findEscapePosition(player, mapGrid, bombs[aiBombIndex].x, bombs[aiBombIndex].y, bombs[aiBombIndex].explosion.range, aiEscapeX, aiEscapeY)) {
+                    aiEscapeX = -1;
+                    aiEscapeY = -1;
+                }
+            }
+
+            return;
+        }
+
+        // Confere se o alvo ainda está vivo.
+        if (aiTarget == -2) {
+            if (currentLevel != 4 || boss.lifes <= 0) {
+                aiState = SEARCHING;
+                aiTarget = -1;
+                return;
+            }
+        } else if (aiTarget < 0 || aiTarget >= enemiesAmount || enemies[aiTarget].lifes <= 0) {
+            aiState = SEARCHING;
+            aiTarget = -1;
+            return;
+        }
+
+        Enemy &targetEnemy = (aiTarget == -2) ? boss : enemies[aiTarget];
+
+        // O alvo pode ter se movimentado.
+        if (!findAttackPosition(player, mapGrid, targetEnemy, aiAttackX, aiAttackY)) {
+            aiState = SEARCHING;
+            return;
+        }
+
+        // Ainda não chegou: caminha um passo.
+        if (player.x != aiAttackX || player.y != aiAttackY) {
+            findPath( player, mapGrid, aiAttackX, aiAttackY, enteredPortal, score);
+            return;
+        }
+
+        // Chegou à posição de ataque: tenta plantar a bomba.
+        if (placeAIBomb(player, mapGrid, bombs, aiBombIndex)) {
+            aiState = ESCAPING;
+
+            if (!findEscapePosition(player, mapGrid, bombs[aiBombIndex].x, bombs[aiBombIndex].y, bombs[aiBombIndex].explosion.range, aiEscapeX, aiEscapeY)) {
+                aiEscapeX = -1;
+                aiEscapeY = -1;
+            }
+        }
+
+        return;
+    }
+
+    if (aiState == ESCAPING) {
+        if (aiBombIndex < 0 || aiBombIndex >= 5) {
+            aiState = SEARCHING;
+            aiBombIndex = -1;
+            return;
+        }
+
+        Bomb &aiBomb = bombs[aiBombIndex];
+
+        // A bomba já explodiu e a explosão terminou.
+        if (!aiBomb.placed && !aiBomb.explosion.isExploding) {
+            aiState = SEARCHING;
+            aiTarget = -1;
+            aiBombIndex = -1;
+            aiEscapeX = -1;
+            aiEscapeY = -1;
+            aiTargetWall = false;
+            aiWallX = -1;
+            aiWallY = -1;
+            return;
+        }
+
+        int bombX = aiBomb.placed ? aiBomb.x : aiBomb.explosion.x;
+        int bombY = aiBomb.placed ? aiBomb.y : aiBomb.explosion.y;
+
+        bool danger[13][19] = {};
+
+        markBombDanger(
+            mapGrid, danger,
+            bombX, bombY,
+            aiBomb.explosion.range
+        );
+
+        // Se ainda não tem destino ou ele deixou de ser seguro,
+        // tenta escolher outra posição de fuga.
+        if (aiEscapeX < 0 || aiEscapeY < 0 || danger[aiEscapeY][aiEscapeX] || (mapGrid[aiEscapeY][aiEscapeX] != 0 && mapGrid[aiEscapeY][aiEscapeX] != 9)) {
+
+            if (!findEscapePosition(player, mapGrid, bombX, bombY, aiBomb.explosion.range, aiEscapeX, aiEscapeY)){
+                return;
+            }
+        }
+
+        // Só precisa andar enquanto não chegou à posição segura.
+        if (player.x != aiEscapeX || player.y != aiEscapeY) {
+            findPath(player, mapGrid, aiEscapeX, aiEscapeY, enteredPortal, score);
+            return;
+        }
+
+        // Chegou na casa segura: se a bomba for remota, a IA "aperta o R".
+        // Vencer o pavio faz o timer do laço principal detonar ela no proximo frame.
+        if (aiBomb.placed && aiBomb.isRemote) {
+            aiBomb.bombTimer = chrono::steady_clock::now() - chrono::seconds(20);
+        }
+
+        return;
+    }
+
+    if (aiState == GOING_TO_PORTAL) {
+        // Confere se a posição escolhida ainda é válida.
+        if (aiAttackX < 0 || aiAttackY < 0 || (mapGrid[aiAttackY][aiAttackX] != 0 && mapGrid[aiAttackY][aiAttackX] != 9) || mapGrid[aiPortalY][aiPortalX] != 8) {
+            if (!findPortalApproach(player, mapGrid, aiAttackX, aiAttackY, aiPortalX, aiPortalY)) {
+                return;
+            }
+        }
+
+        if (player.x != aiAttackX || player.y != aiAttackY) {
+            findPath(player, mapGrid, aiAttackX, aiAttackY, enteredPortal, score);
+            return;
+        }
+
+        // Está ao lado do portal: tenta entrar nele.
+        int moveX = aiPortalX - player.x;
+        int moveY = aiPortalY - player.y;
+
+        player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, score, moveX, moveY);
+
+        return;
+    }
+}
+
+void resetAI() {
+    aiState = SEARCHING;
+
+    aiTarget = -1;
+    aiAttackX = -1;
+    aiAttackY = -1;
+
+    aiEscapeX = -1;
+    aiEscapeY = -1;
+
+    aiBombIndex = -1;
+
+    aiTargetWall = false;
+    aiWallX = -1;
+    aiWallY = -1;
+
+    aiPortalX = -1;
+    aiPortalY = -1;
+}
+
 // ========================================FIM DAS FUNÇÕES=================================================
 
 
@@ -889,10 +1608,13 @@ int main() {
 		player = {.x = 1, .y = 1, .maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .alive = true, .immuneToExplosion = false};
         score = 0;
         alreadyPlayed = true; // Marca que entrou no jogo uma vez
-        currentLevel = 4;
+        currentLevel = 1;
         enteredPortal = false;
+        resetAI();
         int enemiesAmount;
 		    GAME.powerUpsNumber = 0;
+        GAME.extremeExplosion = false;
+        GAME.extremeTexture = "";
 
 
         int enemyRandomMoveChance;
@@ -963,11 +1685,11 @@ int main() {
         //Variavel para tecla pressionada
         char keyPressed;
 
+        player = {.maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .immuneToExplosion = false};
 
         //Começa o jogo de verdade
         while(player.alive && currentLevel < 5){
 
-            player = {.maxConcurrentBombs = 1, .totalBombsPlaced = 0, .range = 1, .immuneToExplosion = false};
             GAME.gameStartTime = chrono::steady_clock::now(), GAME.gameSeconds = 0;
 
             while(player.alive && enteredPortal == false){ //Condição de VITÓRIA: Passar pelo portal. Condição de DERROTA: Morrer
@@ -996,14 +1718,24 @@ int main() {
                     cout << gameTimeSeconds << "\033[K" << endl;
                 }
 
+                // Barras do noclip / explosao extrema e os indicadores de bomba remota
+                drawPowerUpBars(player);
+
                 if (currentLevel == 4) {
                     drawBossBar(boss);
                 }
 
+                // Apaga tudo que estiver abaixo do cursor, senao sobra sujeira na tela
+                // quando uma linha de powerup deixa de ser impressa.
+                cout << "\033[J";
+
                 // cout << "                   Powerups: " << GAME.powerUpsNumber << "\033[K" << endl;
 
                 ///Executa os movimentos
-                if ( _kbhit() ){
+                if(IAPlay){
+                    playerAIMovement(player, mapGrid, bombs, enemies, enemiesAmount, boss, enteredPortal, score);
+                }
+                else if ( _kbhit()){
                     keyPressed = getch();
                     switch(keyPressed)
                     {
@@ -1023,9 +1755,20 @@ int main() {
                             player.movement(mapGrid, enteredPortal, GAME.powerUpsNumber, score, 1);
                             player.totalMovement +=1;
                         break;
+                        case 'r': case 'R': /// Detona todas as bombas remotas que estao no mapa
+                            for (int k = 0; k < player.maxConcurrentBombs; k++) {
+                                if (bombs[k].placed && bombs[k].isRemote) {
+                                    bombs[k].placed = false;
+                                    bombs[k].explode(mapGrid, score, player, bombs, enemies, boss, enemiesAmount);
+                                    cout << "\a"; // Som de EXPLOSAO (beep)
+                                }
+                            }
+                        break;
                         case 13: case 32: case 'f':
                             // Se há espaço para colocar uma nova bomba, o F posiciona uma bomba na posição atual do jogador
-                            if (player.totalBombsPlaced < player.maxConcurrentBombs && mapGrid[player.y][player.x] != 3) {
+                            // (com o noclip ligado nao da pra colocar bomba de dentro de uma parede)
+                            if (player.totalBombsPlaced < player.maxConcurrentBombs && mapGrid[player.y][player.x] != 3
+                                && mapGrid[player.y][player.x] != 2 && mapGrid[player.y][player.x] != 7) {
                                 mapGrid[player.y][player.x] = 3;
 
                                 for (int k = 0; k < player.maxConcurrentBombs; k++) {
@@ -1033,8 +1776,13 @@ int main() {
                                         bombs[k].x = player.x;
                                         bombs[k].y = player.y;
                                         bombs[k].placed = true;
-                                        bombs[k].explosion.range = player.range;
+                                        bombs[k].explosion.range = GAME.extremeExplosion ? 10 : player.range;
+                                        bombs[k].isRemote = (player.remoteBombsLeft > 0);
                                         bombs[k].bombTimer = chrono::steady_clock::now(); // Define o tempo em que a bomba foi posicionada
+
+                                        if (bombs[k].isRemote)
+                                            player.remoteBombsLeft--;
+
                                         break;
                                     }
                                 }
@@ -1046,7 +1794,6 @@ int main() {
                     }
 
                 }
-
 
                 // MOVIMENTO DOS INIMIGOS:
                 {
@@ -1180,11 +1927,41 @@ int main() {
 					}
 				}
 
+				// timer do noclip
+				if (player.noClip) {
+                    int tempSecs = globalTimer(player.noClipTimer, 10, player.noClip, true);
+                    player.noClipTexture = "";
+
+                    for (int i = 0; i < tempSecs; i++) {
+                        player.noClipTexture = player.noClipTexture + "█";
+                    }
+
+					// Se o tempo acabou com o player dentro de uma parede, ela quebra (sem dar pontos)
+					if (!player.noClip && (mapGrid[player.y][player.x] == 2 || mapGrid[player.y][player.x] == 7)) {
+						if (mapGrid[player.y][player.x] == 7) {
+							GAME.powerUpsNumber--;
+							GAME.powerUpGrid[player.y][player.x] = static_cast<PowerUpType>(0);
+						}
+						mapGrid[player.y][player.x] = 0;
+					}
+				}
+
+				// timer da explosao extrema
+				if (GAME.extremeExplosion) {
+                    int tempSecs = globalTimer(GAME.extremeExplosionTimer, 10, GAME.extremeExplosion, true);
+                    GAME.extremeTexture = "";
+
+                    for (int i = 0; i < tempSecs; i++) {
+                        GAME.extremeTexture = GAME.extremeTexture + "█";
+                    }
+				}
+
 
                  // timer da bomba depois de posicionada (ANTES DE EXPLODIR):
+                 // a bomba remota tem um pavio de seguranca bem mais longo
                 for (int k = 0; k < player.maxConcurrentBombs; k++) {
                     if (bombs[k].placed) {
-                        bombs[k].texture = globalTimer(bombs[k].bombTimer, 3, bombs[k].placed, true);
+                        bombs[k].texture = globalTimer(bombs[k].bombTimer, bombs[k].isRemote ? 15 : 3, bombs[k].placed, true);
                         if (!bombs[k].placed) {
                             bombs[k].explode(mapGrid, score, player, bombs, enemies, boss, enemiesAmount);
                             cout << "\a"; // Som de EXPLOSAO (beep)
@@ -1333,8 +2110,11 @@ int main() {
         Ranking save;
         save.dataHour = dataHourNow();
         save.levelReached = currentLevel;
+        if(boss.lifes <= 0){
+            save.levelReached = 4;
+        }
         save.nick = player.nick;
-        save.totalBombsPlaces = player.totalBombsPlaced;
+        save.totalBombsPlaces = player.bombsPlaced;
         save.totalKills = player.enemiesKilled;
         save.totalMoves = player.totalMovement;
         save.totalWallsBreaked = player.totalWallsBroken;
