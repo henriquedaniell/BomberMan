@@ -8,6 +8,7 @@ using namespace std;
 
 string difficultyString = "Facil";
 int difficulty = 1;
+bool IAPlay = false;
 
 void instructions() {
     system("cls");
@@ -162,6 +163,72 @@ void chooseDifficulty(int &difficulty, string &difficultyString) {
     }
 }
 
+void playAlone() {
+    int escolha;
+    int intIAPlay;
+    while (true) {
+
+        if(IAPlay)
+            intIAPlay = 2;
+        else
+            intIAPlay = 1;
+
+        system("cls");
+
+        cout << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |             Jogar Sozinho              |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |                                        |" << endl;
+        cout << "  |  1 - Desativado                        |" << endl;
+        cout << "  |  2 - Ativado                           |" << endl;
+        cout << "  |                                        |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << "  |  Atual: ";
+
+        switch (intIAPlay) {
+            case 1:
+                cout << "Desativado";
+                break;
+            case 2:
+                cout << "Ativado   ";
+                break;
+        }
+
+        cout << "                     |" << endl;
+        cout << "  +----------------------------------------+" << endl;
+        cout << endl;
+        cout << "  Escolha (1-2) ou 0 para voltar: ";
+
+        cin >> escolha;
+
+        if (cin.fail()) {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            continue;
+        }
+
+        if (escolha == 0) {
+            return;
+        }
+
+        if (escolha < 1 || escolha > 2) {
+            continue;
+        }
+
+        switch (escolha) {
+            case 1:
+                IAPlay = false;
+                break;
+            case 2:
+                IAPlay = true;
+                break;
+        }
+
+        return;
+    }
+}
+
 // ========================================
 // MENU PRINCIPAL
 // ========================================
@@ -205,6 +272,11 @@ bool menu(bool &alreadyPlayed) {
         cout << "  |  6 - Creditos                          |" << endl;
         cout << "  |  7 - Sair                              |" << endl;
         cout << "  |                                        |" << endl;
+        if(!IAPlay)
+            cout << "  |  0 - Jogar Sozinho (Desativado)        |" << endl;
+        else
+            cout << "  |  0 - Jogar Sozinho (Ativado)           |" << endl;
+        cout << "  |                                        |" << endl;
         cout << "  +----------------------------------------+" << endl;
         cout << endl;
         cout << "  Escolha uma opcao: ";
@@ -243,6 +315,10 @@ bool menu(bool &alreadyPlayed) {
 
             case 7:
                 return false;
+
+            case 0:
+                playAlone();
+                break;
 
             default:
                 break;
